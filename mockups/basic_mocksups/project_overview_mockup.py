@@ -5,6 +5,7 @@ import requests
 import time
 import threading
 from datetime import datetime, timedelta
+import functools
 
 PROMETHEUS_URL = "https://host-172-16-100-248.nubes.stfc.ac.uk" 
 
@@ -104,8 +105,7 @@ HTML_TEMPLATE = """
 <body class="bg-gray-50 text-gray-800">
     <div class="container mx-auto p-4 md:p-8 max-w-7xl">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-gray-900">Project Carbon Footprint Dashboard</h1>
-            <p class="text-lg text-gray-600 mt-2">Analyze the environmental impact of your compute projects.</p>
+            <h1 class="text-4xl font-bold text-gray-900">Project Overview</h1>
         </header>
         
         <div class="card">
@@ -154,6 +154,13 @@ HTML_TEMPLATE = """
             </div>
         </div>
 
+        <div class="card mt-6 col-span-1 md:col-span-2">
+            <h3 class="text-xl font-semibold mb-4">Improvement & Ranking Analysis</h3>
+            <div id="improvement-metrics" class="space-y-4 text-gray-600">
+                <p>Improvement analysis will appear here.</p>
+            </div>
+        </div>
+
         <footer class="mt-8 text-center text-sm text-gray-500">
             <p>Project usage data from local Prometheus. UK Grid data from <a href="https://carbonintensity.org.uk/" target="_blank" class="text-blue-500 hover:underline">National Grid ESO</a>.</p>
         </footer>
@@ -167,6 +174,7 @@ HTML_TEMPLATE = """
         const periodContainer = document.getElementById('period-select');
         const analysisContent = document.getElementById('analysis-content');
         const equivalencyContent = document.getElementById('equivalency-metrics');
+        const improvementContent = document.getElementById('improvement-metrics');
 
         periodContainer.addEventListener('click', (e) => {
             if (e.target.classList.contains('period-btn')) {
@@ -205,6 +213,7 @@ HTML_TEMPLATE = """
                 console.error("Failed to fetch analysis:", error);
                 analysisContent.innerHTML = `<p class="text-red-500 p-4">Could not load analysis: ${error.message}</p>`;
                 equivalencyContent.innerHTML = '<p class="text-red-500">Error loading data.</p>';
+                improvementContent.innerHTML = '<p class="text-red-500">Error loading data.</p>';
                 if (analysisChartInstance) analysisChartInstance.destroy();
             }
         }
@@ -212,6 +221,7 @@ HTML_TEMPLATE = """
         function setLoadingState() {
             analysisContent.innerHTML = '<div class="loader"></div>';
             equivalencyContent.innerHTML = '<p>Calculating...</p>';
+            improvementContent.innerHTML = '<p>Calculating...</p>';
         }
         
         function renderResults(data) {
@@ -257,8 +267,67 @@ HTML_TEMPLATE = """
                         <p class="text-sm">of a Paris to Dubai flight per passenger.</p>
                     </div>
                 </div>`;
-
+            
+            renderImprovementMetrics(data.improvement_metrics);
             renderAnalysisChart(data.details);
+        }
+
+        function renderImprovementMetrics(improvements) {
+            if (!improvements) {
+                improvementContent.innerHTML = '<p>No improvement data available.</p>';
+                return;
+            }
+
+            let improvementHTML = '';
+
+            if (improvements.potential_savings_kg !== undefined && improvements.potential_savings_kg > 0.01) {
+                improvementHTML += `
+                    <div class="flex items-center p-3 bg-blue-50 rounded-lg">
+                        <span class="text-3xl mr-4">💡</span>
+                        <div>
+                            <p class="font-semibold">Shift your workload to the greenest times to save up to ${improvements.potential_savings_kg.toFixed(2)} kgCO₂.</p>
+                            <p class="text-sm">That's a potential <span class="font-bold text-green-600">${improvements.potential_savings_percent.toFixed(0)}%</span> reduction for this period.</p>
+                        </div>
+                    </div>`;
+            }
+
+            if (improvements.monthly_comparison_percent !== undefined) {
+                const isPositive = improvements.monthly_comparison_percent > 0;
+                const comparison_class = isPositive ? 'text-red-600' : 'text-green-600';
+                const comparison_text = isPositive ? 'more' : 'less';
+                improvementHTML += `
+                    <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                        <span class="text-3xl mr-4">📅</span>
+                        <div>
+                            <p class="font-semibold">This is <span class="${comparison_class}">${Math.abs(improvements.monthly_comparison_percent).toFixed(0)}% ${comparison_text}</span> carbon than the previous month.</p>
+                        </div>
+                    </div>`;
+            }
+
+            if (improvements.rank !== undefined) {
+                improvementHTML += `
+                    <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                        <span class="text-3xl mr-4">🏆</span>
+                        <div>
+                            <p class="font-semibold">This project has the #${improvements.rank} highest carbon footprint out of ${improvements.total_projects} projects.</p>
+                        </div>
+                    </div>`;
+            }
+            
+            if (improvements.comparison_to_average_percent !== undefined && improvements.total_projects > 1) {
+                const isHigher = improvements.comparison_to_average_percent > 0;
+                const avg_comparison_class = isHigher ? 'text-red-600' : 'text-green-600';
+                const avg_comparison_text = isHigher ? 'higher' : 'lower';
+                 improvementHTML += `
+                    <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                        <span class="text-3xl mr-4">📊</span>
+                        <div>
+                            <p class="font-semibold">Its footprint is <span class="${avg_comparison_class}">${Math.abs(improvements.comparison_to_average_percent).toFixed(0)}% ${avg_comparison_text}</span> than the average of all projects.</p>
+                        </div>
+                    </div>`;
+            }
+            
+            improvementContent.innerHTML = improvementHTML || '<p>No specific improvement actions identified for this period.</p>';
         }
 
         function renderAnalysisChart(data) {
@@ -317,6 +386,74 @@ HTML_TEMPLATE = """
 </html>
 """
 
+@functools.lru_cache(maxsize=128)
+def get_carbon_intensity_data(start_str, end_str):
+    """Cached function to fetch carbon intensity data for a given period."""
+    ci_api_url = f"https://api.carbonintensity.org.uk/intensity/{start_str}/{end_str}"
+    print(f"Fetching Carbon Intensity data: {ci_api_url}")
+    ci_response = requests.get(ci_api_url)
+    ci_response.raise_for_status()
+    return ci_response.json()['data']
+
+def _get_footprint_for_project_period(project, start_time, end_time, step):
+    """Helper function to calculate total footprint for a given project and period."""
+    start_prom = start_time.isoformat("T") + "Z"
+    end_prom = end_time.isoformat("T") + "Z"
+
+    project_filter = f'cloud_project_name="{project}"' if project != 'all_projects' else ''
+    energy_query = ENERGY_METRIC_QUERY_TEMPLATE.format(
+        cpu_power_max=CPU_POWER_MAX,
+        cpu_power_idle=CPU_POWER_IDLE,
+        project_filter=project_filter
+    )
+    
+    prom_api_url = f"{PROMETHEUS_URL}/api/v1/query_range"
+    params = {'query': energy_query, 'start': start_prom, 'end': end_prom, 'step': step}
+    
+    prom_response = requests.get(prom_api_url, params=params, verify=False)
+    prom_response.raise_for_status()
+    prom_data = prom_response.json()
+
+    if prom_data['status'] != 'success' or not prom_data['data']['result']:
+        return 0, [], None 
+
+    usage_by_timestamp = {}
+    for result in prom_data['data']['result']:
+        for value in result['values']:
+            ts, val = int(value[0]), float(value[1])
+            usage_by_timestamp[ts] = usage_by_timestamp.get(ts, 0) + val
+
+    start_ci = start_time.strftime('%Y-%m-%dT%H:%MZ')
+    end_ci = end_time.strftime('%Y-%m-%dT%H:%MZ')
+    ci_data = get_carbon_intensity_data(start_ci, end_ci)
+
+    detailed_results = []
+    total_footprint_gco2 = 0
+    sorted_usage_ts = sorted(usage_by_timestamp.keys())
+    if not sorted_usage_ts:
+        return 0, [], ci_data
+
+    for interval in ci_data:
+        interval_dt = datetime.strptime(interval['from'], '%Y-%m-%dT%H:%MZ')
+        interval_ts = int(interval_dt.timestamp())
+        
+        closest_ts = min(sorted_usage_ts, key=lambda x: abs(x - interval_ts))
+        usage_kwh = usage_by_timestamp.get(closest_ts, 0)
+        
+        intensity = interval['intensity'].get('actual')
+        if intensity is None: continue
+
+        footprint_gco2 = usage_kwh * intensity
+        total_footprint_gco2 += footprint_gco2
+        
+        detailed_results.append({
+            'from': interval['from'], 'to': interval['to'],
+            'usage_kwh': usage_kwh, 'intensity_actual': intensity,
+            'footprint_gco2': footprint_gco2
+        })
+    
+    return total_footprint_gco2 / 1000, detailed_results, ci_data
+
 
 @app.route('/')
 def index():
@@ -326,14 +463,13 @@ def index():
 @app.route('/calculate_footprint')
 def calculate_footprint():
     """
-    API endpoint to fetch energy data and carbon intensity, then calculate
-    the carbon footprint based on user-selected project and time period.
+    API endpoint to fetch energy data, carbon intensity, and calculate
+    the carbon footprint and improvement metrics.
     """
     project = request.args.get('project', 'all_projects')
     period = request.args.get('period', 'day')
 
     try:
-
         end_time = datetime.utcnow()
         if period == 'year':
             start_time = end_time - timedelta(days=365)
@@ -344,71 +480,55 @@ def calculate_footprint():
         else: 
             start_time = end_time - timedelta(days=1)
             step = '30m'
+
+        total_footprint_kg, detailed_results, ci_data = _get_footprint_for_project_period(project, start_time, end_time, step)
         
-        end_prom = end_time.isoformat("T") + "Z"
-        start_prom = start_time.isoformat("T") + "Z"
+        if not detailed_results:
+             raise ValueError("No data available for the selected project and period.")
 
-        project_filter = f'cloud_project_name="{project}"' if project != 'all_projects' else ''
-        energy_query = ENERGY_METRIC_QUERY_TEMPLATE.format(
-            cpu_power_max=CPU_POWER_MAX,
-            cpu_power_idle=CPU_POWER_IDLE,
-            project_filter=project_filter
-        )
-
-        prom_api_url = f"{PROMETHEUS_URL}/api/v1/query_range"
-        params = { 'query': energy_query, 'start': start_prom, 'end': end_prom, 'step': step }
+        improvement_metrics = {}
         
-        print(f"Querying Prometheus: {prom_api_url} with params: {params}")
-        
-        prom_response = requests.get(prom_api_url, params=params, verify=False)
-        prom_response.raise_for_status()
-        prom_data = prom_response.json()
+        total_kwh = sum(d['usage_kwh'] for d in detailed_results)
+        valid_intensities = [d['intensity_actual'] for d in detailed_results if d['intensity_actual'] is not None]
+        if valid_intensities:
+            min_intensity = min(valid_intensities)
+            potential_footprint_kg = (total_kwh * min_intensity) / 1000
+            potential_savings_kg = total_footprint_kg - potential_footprint_kg
+            improvement_metrics['potential_savings_kg'] = potential_savings_kg
+            improvement_metrics['potential_savings_percent'] = (potential_savings_kg / total_footprint_kg * 100) if total_footprint_kg > 0 else 0
 
-        if prom_data['status'] != 'success' or not prom_data['data']['result']:
-            raise ValueError("No data returned from Prometheus. Ensure 'node_cpu_seconds_total' metric is available and project labels are correct.")
+        if period == 'month':
+            prev_start_time = start_time - timedelta(days=30)
+            prev_end_time = start_time
+            prev_footprint_kg, _, _ = _get_footprint_for_project_period(project, prev_start_time, prev_end_time, step)
+            if prev_footprint_kg > 0:
+                monthly_change = ((total_footprint_kg - prev_footprint_kg) / prev_footprint_kg) * 100
+                improvement_metrics['monthly_comparison_percent'] = monthly_change
 
 
-        usage_by_timestamp = {}
-        for result in prom_data['data']['result']:
-            for value in result['values']:
-                ts, val = int(value[0]), float(value[1])
-                usage_by_timestamp[ts] = usage_by_timestamp.get(ts, 0) + val
-
-
-        start_ci = start_time.strftime('%Y-%m-%dT%H:%MZ')
-        end_ci = end_time.strftime('%Y-%m-%dT%H:%MZ')
-        ci_api_url = f"https://api.carbonintensity.org.uk/intensity/{start_ci}/{end_ci}"
-        
-        ci_response = requests.get(ci_api_url)
-        ci_response.raise_for_status()
-        ci_data = ci_response.json()['data']
-
-        detailed_results = []
-        total_footprint_gco2 = 0
-
-        sorted_usage_ts = sorted(usage_by_timestamp.keys())
-
-        for interval in ci_data:
-            interval_dt = datetime.strptime(interval['from'], '%Y-%m-%dT%H:%MZ')
-            interval_ts = int(interval_dt.timestamp())
+        if project != 'all_projects':
+            all_projects = [p for p in PROJECT_LABELS if p != 'all_projects']
+            project_footprints = []
+            for p in all_projects:
+                footprint, _, _ = _get_footprint_for_project_period(p, start_time, end_time, step)
+                project_footprints.append({'project': p, 'footprint': footprint})
             
-            closest_ts = min(sorted_usage_ts, key=lambda x: abs(x - interval_ts))
-            usage_kwh = usage_by_timestamp.get(closest_ts, 0)
+            project_footprints.sort(key=lambda x: x['footprint'], reverse=True)
             
-            intensity = interval['intensity']['actual']
-            if intensity is None: continue
+            try:
+                rank = [i for i, p in enumerate(project_footprints) if p['project'] == project][0] + 1
+                improvement_metrics['rank'] = rank
+                improvement_metrics['total_projects'] = len(all_projects)
+            except IndexError:
+                pass 
 
-            footprint_gco2 = usage_kwh * intensity
-            total_footprint_gco2 += footprint_gco2
-            
-            detailed_results.append({
-                'from': interval['from'], 'to': interval['to'],
-                'usage_kwh': usage_kwh, 'intensity_actual': intensity,
-                'footprint_gco2': footprint_gco2
-            })
+            total_average_footprint = sum(p['footprint'] for p in project_footprints)
+            if len(all_projects) > 1:
+                average_footprint = total_average_footprint / len(all_projects)
+                if average_footprint > 0:
+                    comparison_to_avg = ((total_footprint_kg - average_footprint) / average_footprint) * 100
+                    improvement_metrics['comparison_to_average_percent'] = comparison_to_avg
         
-
-        total_footprint_kg = total_footprint_gco2 / 1000
         equivalencies = {
             "tree_months": total_footprint_kg / KG_CO2_PER_TREE_MONTH,
             "car_km": total_footprint_kg * KM_PER_KG_CO2_CAR,
@@ -423,7 +543,8 @@ def calculate_footprint():
             'details': detailed_results, 
             'best_time': best_time, 
             'worst_time': worst_time,
-            'equivalencies': equivalencies
+            'equivalencies': equivalencies,
+            'improvement_metrics': improvement_metrics
         })
 
     except requests.exceptions.RequestException as e:
@@ -440,4 +561,4 @@ if __name__ == '__main__':
     uk_data_fetch_thread = threading.Thread(target=fetch_and_export_uk_data, daemon=True)
     uk_data_fetch_thread.start()
     
-    app.run(host='0.0.0.0', port=8000, debug=True)
+    app.run(host='0.0.0.0', port=8000, debug=False)

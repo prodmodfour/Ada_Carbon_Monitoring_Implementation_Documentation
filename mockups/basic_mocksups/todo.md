@@ -8,6 +8,6 @@
 
 * Improvement
     Moving jobs from x time to y time
-    You're using x more carbon this month than average / less this month
+    You're using x more carbon this month than you usually do / less this month
     You have the x highest carbon footprint usage 
     your carbon footprint usage is x higher than average
