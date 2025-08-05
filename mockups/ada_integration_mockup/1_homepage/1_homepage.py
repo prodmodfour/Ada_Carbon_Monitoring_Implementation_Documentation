@@ -571,4 +571,4 @@ if __name__ == '__main__':
     uk_data_fetch_thread = threading.Thread(target=fetch_and_export_uk_data, daemon=True)
     uk_data_fetch_thread.start()
 
-    app.run(host='0.0.0.0', port=8000, debug=True)
+    app.run(host='0.0.0.0', port=5003, debug=True)

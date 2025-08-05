@@ -375,4 +375,4 @@ app.wsgi_app = DispatcherMiddleware(app.wsgi_app, { '/metrics': make_wsgi_app() 
 if __name__ == '__main__':
     uk_data_fetch_thread = threading.Thread(target=fetch_and_export_uk_data, daemon=True)
     uk_data_fetch_thread.start()
-    app.run(host='0.0.0.0', port=8000)
+    app.run(host='0.0.0.0', port=5002)
