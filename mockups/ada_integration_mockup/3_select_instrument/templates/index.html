@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="content-header">
+    <a href="#" class="back-button"><i class="fa-solid fa-arrow-left"></i></a>
+</div>
+
+<div class="instrument-selection-container">
+    <h2><i class="fa-solid fa-desktop"></i> Select your instrument ...</h2>
+    <div class="instrument-grid">
+        {% for instrument in instruments %}
+        <a href="#" class="instrument-card">
+            <div class="instrument-name">{{ instrument.name }}</div>
+            <div class="instrument-carbon-usage">
+                <i class="fa-solid fa-leaf"></i> {{ instrument.carbon_usage }} gCO₂eq/hour
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

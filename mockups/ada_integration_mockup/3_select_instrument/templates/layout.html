@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CLF Data Analysis</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <nav class="sidebar">
+            <ul>
+                <li class="active"><a href="#"><i class="fa-solid fa-layer-group"></i> Workspaces</a></li>
+                <li><a href="#"><i class="fa-regular fa-folder"></i> Data</a></li>
+                <li><a href="#"><i class="fa-solid fa-flask"></i> Experiments</a></li>
+            </ul>
+            <ul class="sidebar-bottom">
+                 <li><a href="#"><i class="fa-regular fa-circle-question"></i> Help</a></li>
+                 <li><a href="#"><i class="fa-solid fa-circle-info"></i> About</a></li>
+            </ul>
+        </nav>
+
+        <div class="main-wrapper">
+            <header>
+                <div class="header-title">CLF Data Analysis</div>
+                <a href="#" class="logout">LOGOUT</a>
+            </header>
+            <main class="content">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+</body>
+</html>
