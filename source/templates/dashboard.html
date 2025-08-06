@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sustainability Dashboard</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f6; color: #333; }
+        .container { max-width: 900px; margin: 40px auto; padding: 20px; background-color: #fff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #005f6b; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Carbon Usage History (gCO2eq per minute)</h1>
+        <canvas id="carbonChart"></canvas>
+    </div>
+
+    <script>
+        async function renderChart() {
+            const response = await fetch('/api/v1/all_readings');
+            const data = await response.json();
+
+            const labels = data.map(reading => new Date(reading.timestamp).toLocaleTimeString());
+            const chartData = data.map(reading => reading.gco2eq);
+
+            const ctx = document.getElementById('carbonChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line', 
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'gCO2eq',
+                        data: chartData,
+                        borderColor: '#005f6b',
+                        backgroundColor: 'rgba(0, 95, 107, 0.1)',
+                        fill: true,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        renderChart();
+    </script>
+</body>
+</html>
