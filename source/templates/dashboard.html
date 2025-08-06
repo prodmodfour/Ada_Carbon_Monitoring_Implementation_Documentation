@@ -5,51 +5,120 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sustainability Dashboard</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f6; color: #333; }
-        .container { max-width: 900px; margin: 40px auto; padding: 20px; background-color: #fff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        h1 { text-align: center; color: #005f6b; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
+        .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; grid-gap: 20px; max-width: 1200px; margin: 0 auto; }
+        .card { background-color: #fff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); padding: 20px; }
+        .full-width { grid-column: 1 / -1; }
+        h1, h2 { color: #005f6b; text-align: center; }
+        .summary-box { text-align: center; }
+        .summary-box h3 { margin-top: 0; }
+        .summary-box .value { font-size: 2em; font-weight: bold; color: #008793; }
+        .summary-box .percent { font-size: 1.5em; font-weight: bold; }
+        .percent.positive { color: #28a745; }
+        .percent.negative { color: #dc3545; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 </head>
 <body>
-    <div class="container">
-        <h1>Carbon Usage History (gCO2eq per minute)</h1>
-        <canvas id="carbonChart"></canvas>
+
+    <div class="dashboard-grid">
+        <div class="card full-width">
+            <h1>Sustainability Dashboard</h1>
+        </div>
+
+        <div class="card">
+            <h2>Live Carbon Intensity</h2>
+            <div class="summary-box">
+                <h3 id="intensity-level">Loading...</h3>
+                <div id="intensity-value" class="value">--</div>
+                <div>gCO2/kWh</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Recent Performance</h2>
+            <div class="summary-box">
+                <h3>Improvement (last 7 days vs previous)</h3>
+                <div id="improvement-percent" class="percent">--%</div>
+            </div>
+        </div>
+        
+        <div class="card full-width">
+            <h2>Carbon Usage History (gCO2eq per minute)</h2>
+            <canvas id="carbonHistoryChart"></canvas>
+        </div>
+
+        <div class="card full-width">
+            <h2>Best Time to Work (Carbon Intensity Forecast)</h2>
+            <canvas id="carbonForecastChart"></canvas>
+        </div>
     </div>
 
     <script>
-        async function renderChart() {
-            const response = await fetch('/api/v1/all_readings');
-            const data = await response.json();
 
-            const labels = data.map(reading => new Date(reading.timestamp).toLocaleTimeString());
-            const chartData = data.map(reading => reading.gco2eq);
+        function updateIntensityGauge(intensity) {
+            const valueEl = document.getElementById('intensity-value');
+            const levelEl = document.getElementById('intensity-level');
+            valueEl.textContent = intensity;
+            if (intensity <= 50) { levelEl.textContent = "Very Low"; levelEl.style.color = "#28a745"; } 
+            else if (intensity <= 150) { levelEl.textContent = "Low"; levelEl.style.color = "#8fC317"; }
+            else if (intensity <= 250) { levelEl.textContent = "Moderate"; levelEl.style.color = "#ffc107"; }
+            else if (intensity <= 350) { levelEl.textContent = "High"; levelEl.style.color = "#fd7e14"; }
+            else { levelEl.textContent = "Very High"; levelEl.style.color = "#dc3545"; }
+        }
 
-            const ctx = document.getElementById('carbonChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'line', 
+
+        function updatePerformanceSummary(percent) {
+            const percentEl = document.getElementById('improvement-percent');
+            const sign = percent > 0 ? "+" : "";
+            percentEl.textContent = `${sign}${percent.toFixed(1)}%`;
+            percentEl.className = "percent " + (percent >= 0 ? "positive" : "negative");
+        }
+
+
+        async function renderDashboard() {
+
+            const historyResponse = await fetch('/api/v1/all_readings');
+            const historyData = await historyResponse.json();
+            
+            if (historyData.length > 0) {
+
+                const latestReading = historyData[historyData.length - 1];
+                updateIntensityGauge(latestReading.carbon_intensity);
+
+
+                new Chart(document.getElementById('carbonHistoryChart'), {
+                    type: 'line',
+                    data: {
+                        labels: historyData.map(r => new Date(r.timestamp).toLocaleString()),
+                        datasets: [{ label: 'gCO2eq', data: historyData.map(r => r.gco2eq), borderColor: '#005f6b', fill: true }]
+                    }
+                });
+            }
+            
+
+            const perfResponse = await fetch('/api/v1/performance_summary');
+            const perfData = await perfResponse.json();
+            updatePerformanceSummary(perfData.improvement_percent);
+
+
+            const forecastResponse = await fetch('/api/v1/carbon_intensity_forecast');
+            const forecastData = await forecastResponse.json();
+            new Chart(document.getElementById('carbonForecastChart'), {
+                type: 'bar',
                 data: {
-                    labels: labels,
                     datasets: [{
-                        label: 'gCO2eq',
-                        data: chartData,
-                        borderColor: '#005f6b',
-                        backgroundColor: 'rgba(0, 95, 107, 0.1)',
-                        fill: true,
-                        tension: 0.1
+                        label: 'Forecasted Intensity (gCO2/kWh)',
+                        data: forecastData.map(d => ({ x: new Date(d.from), y: d.intensity.forecast })),
+                        backgroundColor: forecastData.map(d => d.intensity.forecast <= 100 ? 'rgba(40, 167, 69, 0.6)' : 'rgba(255, 193, 7, 0.6)')
                     }]
                 },
-                options: {
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
-                }
+                options: { scales: { x: { type: 'time', time: { unit: 'hour' } } } }
             });
         }
 
-        renderChart();
+        renderDashboard();
     </script>
 </body>
 </html>
