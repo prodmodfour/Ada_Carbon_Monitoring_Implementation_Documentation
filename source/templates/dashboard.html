@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sustainability Dashboard</title>
+    <title>Sustainability Dashboard (Live)</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
         .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; grid-gap: 20px; max-width: 1200px; margin: 0 auto; }
@@ -56,6 +56,7 @@
     </div>
 
     <script>
+        let historyChart, forecastChart;
 
         function updateIntensityGauge(intensity) {
             const valueEl = document.getElementById('intensity-value');
@@ -68,7 +69,6 @@
             else { levelEl.textContent = "Very High"; levelEl.style.color = "#dc3545"; }
         }
 
-
         function updatePerformanceSummary(percent) {
             const percentEl = document.getElementById('improvement-percent');
             const sign = percent > 0 ? "+" : "";
@@ -76,49 +76,52 @@
             percentEl.className = "percent " + (percent >= 0 ? "positive" : "negative");
         }
 
+        async function initializeDashboard() {
+            const historyCtx = document.getElementById('carbonHistoryChart').getContext('2d');
+            historyChart = new Chart(historyCtx, { type: 'line', data: { labels: [], datasets: [{ label: 'gCO2eq', data: [], borderColor: '#005f6b', fill: true }] } });
 
-        async function renderDashboard() {
+            const forecastCtx = document.getElementById('carbonForecastChart').getContext('2d');
+            forecastChart = new Chart(forecastCtx, { type: 'bar', options: { scales: { x: { type: 'time', time: { unit: 'hour' } } } } });
 
+            updateDashboard();
+            updateForecastAndSummary(); 
+        }
+
+        async function updateDashboard() {
             const historyResponse = await fetch('/api/v1/all_readings');
             const historyData = await historyResponse.json();
             
             if (historyData.length > 0) {
-
                 const latestReading = historyData[historyData.length - 1];
                 updateIntensityGauge(latestReading.carbon_intensity);
 
-
-                new Chart(document.getElementById('carbonHistoryChart'), {
-                    type: 'line',
-                    data: {
-                        labels: historyData.map(r => new Date(r.timestamp).toLocaleString()),
-                        datasets: [{ label: 'gCO2eq', data: historyData.map(r => r.gco2eq), borderColor: '#005f6b', fill: true }]
-                    }
-                });
+                historyChart.data.labels = historyData.map(r => new Date(r.timestamp).toLocaleString());
+                historyChart.data.datasets[0].data = historyData.map(r => r.gco2eq);
+                historyChart.update();
             }
-            
+        }
+        
+        async function updateForecastAndSummary() {
 
             const perfResponse = await fetch('/api/v1/performance_summary');
             const perfData = await perfResponse.json();
             updatePerformanceSummary(perfData.improvement_percent);
 
-
             const forecastResponse = await fetch('/api/v1/carbon_intensity_forecast');
             const forecastData = await forecastResponse.json();
-            new Chart(document.getElementById('carbonForecastChart'), {
-                type: 'bar',
-                data: {
-                    datasets: [{
-                        label: 'Forecasted Intensity (gCO2/kWh)',
-                        data: forecastData.map(d => ({ x: new Date(d.from), y: d.intensity.forecast })),
-                        backgroundColor: forecastData.map(d => d.intensity.forecast <= 100 ? 'rgba(40, 167, 69, 0.6)' : 'rgba(255, 193, 7, 0.6)')
-                    }]
-                },
-                options: { scales: { x: { type: 'time', time: { unit: 'hour' } } } }
-            });
+            forecastChart.data.datasets = [{
+                label: 'Forecasted Intensity (gCO2/kWh)',
+                data: forecastData.map(d => ({ x: new Date(d.from), y: d.intensity.forecast })),
+                backgroundColor: forecastData.map(d => d.intensity.forecast <= 100 ? 'rgba(40, 167, 69, 0.6)' : 'rgba(255, 193, 7, 0.6)')
+            }];
+            forecastChart.update();
         }
 
-        renderDashboard();
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeDashboard();
+
+            setInterval(updateDashboard, 60000);
+        });
     </script>
 </body>
 </html>
