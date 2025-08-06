@@ -27,10 +27,11 @@ def get_all_readings():
 def get_carbon_forecast():
     """API endpoint to get the 48-hour carbon intensity forecast."""
     try:
-        response = requests.get("https://api.carbonintensity.org.uk/intensity/fw48h")
+        response = requests.get("https://api.carbonintensity.org.uk/fw48h")
         response.raise_for_status()
-        return jsonify(response.json()['data'])
+        return jsonify(response.json())
     except Exception as e:
+        print(f"Error in get_carbon_forecast: {e}") 
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/v1/performance_summary")
@@ -58,7 +59,6 @@ def get_performance_summary():
     })
 
 
-# --- Main Application ---
 
 if __name__ == "__main__":
     logging_thread = threading.Thread(target=start_logging, daemon=True)
