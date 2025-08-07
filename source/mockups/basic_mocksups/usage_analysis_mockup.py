@@ -6,11 +6,14 @@ import time
 import threading
 from datetime import datetime, timedelta
 
+# Import 'datetime' as 'dt' for use in the new forecast function
+import datetime as dt
 
-PROMETHEUS_URL = "https://host-172-16-100-248.nubes.stfc.ac.uk" 
 
-CPU_POWER_IDLE = 50  
-CPU_POWER_MAX  = 250 
+PROMETHEUS_URL = "https://host-172-16-100-248.nubes.stfc.ac.uk"
+
+CPU_POWER_IDLE = 50
+CPU_POWER_MAX  = 250
 
 ENERGY_METRIC_QUERY = f"""
     (
@@ -52,12 +55,13 @@ def fetch_and_export_uk_data():
             print("Successfully updated UK-wide carbon metrics for export.")
         except requests.exceptions.RequestException as e:
             print(f"Error fetching UK-wide data from Carbon Intensity API: {e}")
-        
+
         time.sleep(900)
 
 
 app = Flask(__name__)
 
+# --- MODIFIED: Added forecast tab, chart canvas, and associated JavaScript ---
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -67,6 +71,7 @@ HTML_TEMPLATE = """
     <title>UK Carbon Intensity & Your Footprint</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
@@ -81,7 +86,7 @@ HTML_TEMPLATE = """
         .very-low { border-color: #22c55e; } .low { border-color: #84cc16; }
         .moderate { border-color: #facc15; } .high { border-color: #f97316; }
         .very-high { border-color: #ef4444; }
-        #analysis-chart-container { position: relative; height: 400px; width: 100%; }
+        .chart-container { position: relative; height: 400px; width: 100%; }
         .tooltip-info {
             background-color: rgba(0,0,0,0.7);
             color: white;
@@ -96,11 +101,14 @@ HTML_TEMPLATE = """
 <body class="bg-gray-100 text-gray-800">
     <div class="container mx-auto p-4 md:p-8 max-w-6xl">
         <h1 class="text-3xl font-bold mb-6 text-center">UK Carbon Intensity & Your Footprint</h1>
-        
+
         <div class="mb-4 border-b border-gray-200">
             <ul class="flex flex-wrap -mb-px text-sm font-medium text-center" id="myTab" role="tablist">
                 <li class="mr-2" role="presentation">
                     <button class="inline-block p-4 border-b-2 rounded-t-lg" id="dashboard-tab" type="button" role="tab" aria-controls="dashboard" aria-selected="true">Your Footprint Analysis</button>
+                </li>
+                <li class="mr-2" role="presentation">
+                    <button class="inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300" id="forecast-tab" type="button" role="tab" aria-controls="forecast" aria-selected="false">48-Hour Forecast</button>
                 </li>
                 <li class="mr-2" role="presentation">
                     <button class="inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300" id="uk-data-tab" type="button" role="tab" aria-controls="uk-data" aria-selected="false">Live UK Grid Status</button>
@@ -110,14 +118,24 @@ HTML_TEMPLATE = """
 
         <div id="tabContent">
             <div id="dashboard" role="tabpanel" aria-labelledby="dashboard-tab">
-                <div id="analysis-container" class="card">
+                <div class="card">
                     <h2 class="text-2xl font-semibold mb-4 flex items-center">
                         Your 24-Hour Carbon Footprint
                         <span class="tooltip-info" title="This is an estimate based on your server's CPU usage, as direct power monitoring is not available.">ESTIMATED</span>
                     </h2>
                     <div id="analysis-content" class="text-center"><p class="text-lg">Loading your usage data...</p></div>
-                    <div id="analysis-chart-container" class="mt-6">
+                    <div class="chart-container mt-6">
                         <canvas id="analysisChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div id="forecast" class="hidden" role="tabpanel" aria-labelledby="forecast-tab">
+                <div class="card">
+                     <h2 class="text-2xl font-semibold mb-4">48-Hour Carbon Intensity Forecast</h2>
+                     <div id="forecast-content" class="text-center"><p class="text-lg">Loading forecast data...</p></div>
+                     <div class="chart-container mt-6">
+                        <canvas id="forecastChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -134,7 +152,7 @@ HTML_TEMPLATE = """
     </div>
 
     <script>
-        let analysisChartInstance;
+        let analysisChartInstance, forecastChartInstance;
 
         function getIntensityColor(index, opacity = 1) {
             const colors = {
@@ -144,14 +162,14 @@ HTML_TEMPLATE = """
             };
             return colors[index] || `rgba(156, 163, 175, ${opacity})`;
         }
-        
+
         function renderAnalysisChart(data) {
             const ctx = document.getElementById('analysisChart').getContext('2d');
             if (analysisChartInstance) analysisChartInstance.destroy();
             analysisChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: data.map(d => new Date(d.from).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })),
+                    labels: data.map(d => new Date(d.from)),
                     datasets: [{
                         label: 'Your Estimated Carbon Footprint (gCO₂)',
                         data: data.map(d => d.footprint_gco2.toFixed(2)),
@@ -161,7 +179,7 @@ HTML_TEMPLATE = """
                         yAxisID: 'y'
                     }, {
                         label: 'UK Carbon Intensity (gCO₂/kWh)',
-                        data: data.map(d => d.intensity_actual),
+                        data: data.map(d => ({ x: new Date(d.from), y: d.intensity_actual })),
                         type: 'line',
                         borderColor: '#ef4444',
                         backgroundColor: 'transparent',
@@ -172,6 +190,7 @@ HTML_TEMPLATE = """
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     scales: {
+                        x: { type: 'time', time: { unit: 'hour', tooltipFormat: 'HH:mm' } },
                         y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Your Footprint (gCO₂)' } },
                         y1: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'UK Intensity (gCO₂/kWh)' }, grid: { drawOnChartArea: false } }
                     },
@@ -198,6 +217,50 @@ HTML_TEMPLATE = """
                 }
             });
         }
+        
+        function renderForecastChart(data) {
+            const ctx = document.getElementById('forecastChart').getContext('2d');
+            if (forecastChartInstance) forecastChartInstance.destroy();
+            
+            const forecastData = data.map(d => ({
+                x: new Date(d.from),
+                y: d.intensity.forecast,
+                color: getIntensityColor(d.intensity.index)
+            }));
+            
+            forecastChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'Forecasted Carbon Intensity (gCO₂/kWh)',
+                        data: forecastData,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'transparent',
+                        tension: 0.3,
+                        pointBackgroundColor: forecastData.map(d => d.color),
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { type: 'time', time: { unit: 'hour', tooltipFormat: 'dd MMM HH:mm' } },
+                        y: { title: { display: true, text: 'Forecasted Intensity (gCO₂/kWh)' } }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const point = data[context.dataIndex];
+                                    return `Forecast: ${point.intensity.forecast} gCO₂/kWh (${point.intensity.index})`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
         async function fetchPersonalAnalysis() {
             const contentEl = document.getElementById('analysis-content');
@@ -211,8 +274,8 @@ HTML_TEMPLATE = """
                 if (data.error) throw new Error(data.error);
 
                 const totalFootprint = data.total_footprint_kg.toFixed(2);
-                const bestTime = data.best_time ? new Date(data.best_time.from).toLocaleTimeString() : 'N/A';
-                const worstTime = data.worst_time ? new Date(data.worst_time.from).toLocaleTimeString() : 'N/A';
+                const bestTime = data.best_time ? new Date(data.best_time.from).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A';
+                const worstTime = data.worst_time ? new Date(data.worst_time.from).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A';
 
                 contentEl.innerHTML = `
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
@@ -221,11 +284,11 @@ HTML_TEMPLATE = """
                             <p class="text-4xl font-bold">${totalFootprint} <span class="text-2xl">kgCO₂</span></p>
                         </div>
                         <div>
-                            <p class="text-lg text-gray-600">Best Time to Use Energy</p>
+                            <p class="text-lg text-gray-600">Cleanest Period (Past 24h)</p>
                             <p class="text-4xl font-bold text-green-600">${bestTime}</p>
                         </div>
                         <div>
-                            <p class="text-lg text-gray-600">Worst Time to Use Energy</p>
+                            <p class="text-lg text-gray-600">Dirtiest Period (Past 24h)</p>
                             <p class="text-4xl font-bold text-red-600">${worstTime}</p>
                         </div>
                     </div>`;
@@ -236,6 +299,44 @@ HTML_TEMPLATE = """
             }
         }
         
+        async function fetchForecastData() {
+            const contentEl = document.getElementById('forecast-content');
+            try {
+                const response = await fetch('/forecast');
+                 if (!response.ok) {
+                    throw new Error('Failed to fetch forecast from the server.');
+                }
+                const data = await response.json();
+                if (!data || data.length === 0) {
+                     throw new Error('No forecast data was returned.');
+                }
+
+                const bestSlot = data.reduce((min, cur) => cur.intensity.forecast < min.intensity.forecast ? cur : min, data[0]);
+                const worstSlot = data.reduce((max, cur) => cur.intensity.forecast > max.intensity.forecast ? cur : max, data[0]);
+
+                const formatTime = (iso) => new Date(iso).toLocaleTimeString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+
+                contentEl.innerHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
+                        <div>
+                            <p class="text-lg text-gray-600">Best Upcoming Time</p>
+                            <p class="text-3xl font-bold text-green-600">${formatTime(bestSlot.from)}</p>
+                            <p class="text-xl">${bestSlot.intensity.forecast} gCO₂/kWh (${bestSlot.intensity.index})</p>
+                        </div>
+                        <div>
+                            <p class="text-lg text-gray-600">Worst Upcoming Time</p>
+                            <p class="text-3xl font-bold text-red-600">${formatTime(worstSlot.from)}</p>
+                            <p class="text-xl">${worstSlot.intensity.forecast} gCO₂/kWh (${worstSlot.intensity.index})</p>
+                        </div>
+                    </div>`;
+                renderForecastChart(data);
+
+            } catch (error) {
+                 console.error("Failed to fetch forecast data:", error);
+                 contentEl.innerHTML = `<p class="text-red-500">Could not load forecast: ${error.message}</p>`;
+            }
+        }
+
         async function fetchUkData() {
             const container = document.getElementById('uk-data-container');
             try {
@@ -278,13 +379,14 @@ HTML_TEMPLATE = """
                 });
                 this.setAttribute('aria-selected', 'true');
                 this.classList.add('border-blue-600', 'text-blue-600');
-                
+
                 document.querySelectorAll('[role="tabpanel"]').forEach(panel => panel.classList.add('hidden'));
                 document.getElementById(this.getAttribute('aria-controls')).classList.remove('hidden');
             });
         });
 
         fetchPersonalAnalysis();
+        fetchForecastData();
         fetchUkData();
     </script>
 </body>
@@ -295,6 +397,35 @@ HTML_TEMPLATE = """
 def index():
     """Serves the main HTML page."""
     return render_template_string(HTML_TEMPLATE)
+
+
+def get_forecast():
+    """
+    Fetches the 48-hour carbon intensity forecast from the National Grid API.
+    """
+
+    now = dt.datetime.utcnow()
+    minute = 30 if now.minute >= 30 else 0
+    start_dt = now.replace(minute=minute, second=0, microsecond=0)
+    start_iso = start_dt.isoformat() + "Z"
+
+    url = f"https://api.carbonintensity.org.uk/intensity/{start_iso}/fw48h"
+    try:
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        return r.json().get("data", [])
+    except requests.RequestException as e:
+        print(f"API error fetching forecast: {e}")
+        return []
+
+@app.route('/forecast')
+def forecast_endpoint():
+    """API endpoint to serve the forecast data."""
+    data = get_forecast()
+    if not data:
+        return jsonify({'error': 'Could not retrieve forecast data from the Carbon Intensity API.'}), 502
+    return jsonify(data)
+
 
 @app.route('/calculate_footprint')
 def calculate_footprint():
@@ -307,12 +438,13 @@ def calculate_footprint():
         start_time = end_time - timedelta(days=1)
         end_prom = end_time.isoformat("T") + "Z"
         start_prom = start_time.isoformat("T") + "Z"
-        
+
         prom_api_url = f"{PROMETHEUS_URL}/api/v1/query_range"
         params = { 'query': ENERGY_METRIC_QUERY, 'start': start_prom, 'end': end_prom, 'step': '30m' }
-        
+
         print(f"Querying Prometheus: {prom_api_url} with params: {params}")
-        
+
+
         prom_response = requests.get(prom_api_url, params=params, verify=False)
         prom_response.raise_for_status()
         prom_data = prom_response.json()
@@ -325,7 +457,7 @@ def calculate_footprint():
         start_ci = start_time.strftime('%Y-%m-%dT%H:%MZ')
         end_ci = end_time.strftime('%Y-%m-%dT%H:%MZ')
         ci_api_url = f"https://api.carbonintensity.org.uk/intensity/{start_ci}/{end_ci}"
-        
+
         ci_response = requests.get(ci_api_url)
         ci_response.raise_for_status()
         ci_data = ci_response.json()['data']
@@ -336,27 +468,27 @@ def calculate_footprint():
         for interval in ci_data:
             interval_dt = datetime.strptime(interval['from'], '%Y-%m-%dT%H:%MZ')
             interval_ts = int(interval_dt.timestamp())
-            
-            usage_kwh = 0
-            for ts, usage in usage_by_timestamp.items():
-                if abs(ts - interval_ts) <= 900:
-                    usage_kwh = usage
-                    break
-            
+
+
+            matching_ts = min(usage_by_timestamp.keys(), key=lambda ts: abs(ts - interval_ts))
+            usage_kwh = usage_by_timestamp.get(matching_ts, 0) if abs(matching_ts - interval_ts) <= 900 else 0
+
             intensity = interval['intensity']['actual']
             if intensity is None: continue
 
             footprint_gco2 = usage_kwh * intensity
             total_footprint_gco2 += footprint_gco2
-            
+
             detailed_results.append({
                 'from': interval['from'], 'to': interval['to'],
                 'usage_kwh': usage_kwh, 'intensity_actual': intensity,
                 'intensity_index': interval['intensity']['index'], 'footprint_gco2': footprint_gco2
             })
         
-        best_time = min(detailed_results, key=lambda x: x['intensity_actual']) if detailed_results else None
-        worst_time = max(detailed_results, key=lambda x: x['intensity_actual']) if detailed_results else None
+    
+        valid_results = [r for r in detailed_results if r['usage_kwh'] > 0]
+        best_time = min(valid_results, key=lambda x: x['intensity_actual']) if valid_results else None
+        worst_time = max(valid_results, key=lambda x: x['intensity_actual']) if valid_results else None
 
         return jsonify({
             'total_footprint_kg': total_footprint_gco2 / 1000,
