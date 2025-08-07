@@ -552,15 +552,17 @@ def calculate_footprint():
 
 @app.route('/forecast')
 def get_forecast():
-    """API endpoint to fetch the 48-hour carbon intensity forecast."""
+    now = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+    start = now.isoformat(timespec="minutes") + "Z"   
+
+    url = f"https://api.carbonintensity.org.uk/intensity/{start}/fw48h"
     try:
-        response = requests.get("https://api.carbonintensity.org.uk/intensity/fw48h", timeout=10)
-        response.raise_for_status()
-        data = response.json().get('data', [])
-        return jsonify(data)
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching forecast data: {e}")
-        return jsonify({'error': 'Could not fetch forecast data from the API.'}), 502
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        return r.json()["data"]          
+    except requests.RequestException as e:
+        print(f"API error: {e} — response was {r.text}")
+        return jsonify({'error': f'Failed to connect to an external service: {e}'}), 502
 
 
 app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {'/metrics': make_wsgi_app()})
