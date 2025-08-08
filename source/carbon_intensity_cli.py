@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 """
 Carbon Intensity API – Command Line Interface
 
@@ -40,12 +41,7 @@ Usage examples:
   # Regional intensity range for a specific region id
   python carbon_intensity_cli.py regional range --start 2025-08-08 --end 2025-08-09 --region-id 13
 
-Notes
------
-- This CLI expects a sibling module named `carbon_intensity.py` that exposes the functions
-  provided earlier (get_current_intensity, get_intensity_range, etc.).
-- Outputs JSON to stdout by default. Use `--pretty` for indented JSON.
-- For time‑series endpoints, you can also write a CSV with `--csv PATH`.
+
 """
 from __future__ import annotations
 
@@ -55,12 +51,8 @@ import json
 import sys
 from typing import Any, Dict, Iterable, List, Optional
 
-# Import the companion library
-try:
-    import carbon_intensity as ci
-except Exception as e:  # pragma: no cover
-    print("Failed to import 'carbon_intensity'. Make sure carbon_intensity.py is on PYTHONPATH.", file=sys.stderr)
-    raise
+import carbon_intensity_api_functions as ci
+
 
 ############################################################
 # Utilities
