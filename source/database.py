@@ -3,7 +3,6 @@ import sqlite3
 DATABASE_NAME = "sustainability.db"
 
 def create_database():
-    """Creates the database and the 'readings' table if they don't exist."""
     conn = sqlite3.connect(DATABASE_NAME)
     cursor = conn.cursor()
 
@@ -22,7 +21,6 @@ def create_database():
     print(f"Database '{DATABASE_NAME}' and table 'readings' are ready.")
 
 def add_reading(watts, intensity, gco2):
-    """Adds a new monitoring reading to the database."""
     conn = sqlite3.connect(DATABASE_NAME)
     cursor = conn.cursor()
     
