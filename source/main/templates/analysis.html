@@ -1,0 +1,52 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ source_title }}</title>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+  <!-- Top navigation bar with dynamic title -->
+  <header class="top-nav">
+    <div class="left">
+      <img src="{% static 'images/small_atom.png' %}" alt="Atom" class="small-icon">
+      <span class="analysis-title">{{ source_title }}</span>
+    </div>
+    <div class="right">
+      <span class="logout-link">Logout</span>
+    </div>
+  </header>
+  <div class="page-body">
+    <!-- Sidebar navigation -->
+    <nav class="sidebar">
+      <ul>
+        <li><img src="{% static 'images/icon_workspaces.png' %}" alt="">Workspaces</li>
+        <li><img src="{% static 'images/icon_data.png' %}" alt="">Data</li>
+        <li><img src="{% static 'images/icon_experiments.png' %}" alt="">Experiments</li>
+        <li><img src="{% static 'images/icon_question.png' %}" alt="">Help</li>
+        <li><img src="{% static 'images/icon_info.png' %}" alt="">About</li>
+      </ul>
+    </nav>
+    <main class="content">
+      <!-- New workspace call to action -->
+      <div class="analysis-card">
+        <div class="analysis-card-left">
+          <img src="{% static 'images/icon_new_workspace.png' %}" alt="New Workspace" class="analysis-card-icon">
+          <div>
+            <div class="analysis-card-title">New Workspace</div>
+            <div class="analysis-card-subtitle">Workspaces provide you with software and compute resources to analyse your experiment data</div>
+          </div>
+        </div>
+        <div class="analysis-card-right">
+          <img src="{% static 'images/icon_arrow.png' %}" alt="Go">
+        </div>
+      </div>
+      <p class="no-workspaces-message">
+        You don't seem to have any workspaces, create a new workspace to get started.
+      </p>
+    </main>
+  </div>
+</body>
+</html>
