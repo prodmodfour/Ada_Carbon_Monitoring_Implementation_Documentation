@@ -7,11 +7,6 @@
 
 
 
-# Control
-
-## Data Integration
-
-## CLI Functions
 
 # Data 
 
@@ -26,9 +21,6 @@
 ## Electricity Calculation Functions
 
 ## Emissions Calculation Functions
-
-## Database Functions
-
 
 ## Fallback System
 
