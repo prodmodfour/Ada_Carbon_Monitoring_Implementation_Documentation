@@ -1,4 +1,21 @@
-# Data Functions
+# Presentation
+
+## Ada Platform Recreation in **Django**
+
+## Data Display Modules
+
+
+
+
+# Control
+
+## Data Integration
+
+## CLI Functions
+
+# Data 
+
+
 
 
 
@@ -10,14 +27,35 @@
 
 ## Emissions Calculation Functions
 
-# Database Functions
+## Database Functions
 
-# CLI Functions
 
-# Data Representation Classes 
+## Fallback System
 
-# Data Display Modules
 
-# Ada Platform Recreation in Flask
 
-# Data Integration
+
+## Data Representation Classes 
+
+### Virtual Capacity Curve
+
+### GHG Protocol Score
+
+### SCI Score
+
+### Idle Carbon Usage Counter
+
+### Carbon Equivalency 
+
+
+
+
+
+
+
+
+
+
+# Future Features
+
+## Simple / Advanced Toggle
