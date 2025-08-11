@@ -4,6 +4,9 @@
 
 ## Data Display Modules
 
+## Real time configuration changes
+Uses Django Channels
+
 
 
 
@@ -23,6 +26,7 @@
 ## Emissions Calculation Functions
 
 ## Fallback System
+
 
 
 
