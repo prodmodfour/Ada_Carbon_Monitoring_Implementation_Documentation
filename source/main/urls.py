@@ -14,4 +14,9 @@ from . import views
 urlpatterns = [
     path('', views.home, name='home'),
     path('analysis/<str:source>/', views.analysis, name='analysis'),
+    # Route for selecting an instrument when creating a new workspace.
+    # This page displays a grid of available instruments whose
+    # contents vary depending on the selected data source (e.g. ISIS,
+    # CLF or Diamond).
+    path('analysis/<str:source>/instruments/', views.instruments, name='instruments'),
 ]
