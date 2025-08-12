@@ -19,4 +19,8 @@ urlpatterns = [
     # contents vary depending on the selected data source (e.g. ISIS,
     # CLF or Diamond).
     path('analysis/<str:source>/instruments/', views.instruments, name='instruments'),
+
+    path('analysis/<str:source>/instruments/<str:instrument>/', 
+         views.instrument_detail, 
+         name='instrument_detail'),
 ]

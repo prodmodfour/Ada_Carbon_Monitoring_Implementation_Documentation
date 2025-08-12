@@ -39,8 +39,9 @@
         </div>
         <div class="instrument-grid">
           {% for inst in instruments %}
-          <div class="instrument-btn">{{ inst }}</div>
+          <a class="instrument-btn" href="{% url 'instrument_detail' source inst %}">{{ inst }}</a>
           {% endfor %}
+        
         </div>
       </div>
     </main>

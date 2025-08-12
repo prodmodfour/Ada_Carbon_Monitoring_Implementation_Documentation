@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ source_title }} - Select Instrument</title>
+  <title>{{ source_title }} - {{ instrument_name }}</title>
   <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
 <body>
@@ -17,6 +17,7 @@
       <span class="logout-link">Logout</span>
     </div>
   </header>
+
   <div class="page-body">
     <nav class="sidebar">
       <ul>
@@ -27,21 +28,34 @@
         <li><img src="{% static 'images/icon_info.png' %}" alt="">About</li>
       </ul>
     </nav>
+
     <main class="content">
-      <a href="{% url 'analysis' source %}" class="back-button">
-        <img src="{% static 'images/back_arrow.png' %}" alt="Back">
-        Back
+      <a href="{% url 'instruments' source %}" class="back-button">
+        <img src="{% static 'images/back_arrow.png' %}" alt="Back"> Back
       </a>
-      <div class="instrument-container">
-        <div class="instrument-title">
-          <img src="{% static 'images/icon_new_workspace.png' %}" alt="New Workspace">
-          Select your instrument ...
+
+      <div class="instrument-detail-card">
+        <div class="instrument-detail-header">
+          <img src="{% static 'images/icon_new_workspace.png' %}" alt="Instrument" class="analysis-card-icon">
+          <span>{{ instrument_name }}</span>
         </div>
-        <div class="instrument-grid">
-          {% for inst in instruments %}
-          <a class="instrument-btn" href="{% url 'instrument_detail' source inst %}">{{ inst }}</a>
-          {% endfor %}
-        
+
+        <p class="instrument-detail-desc">
+          This Workspace has been configured for {{ instrument_name }} experiments.
+        </p>
+
+        <div class="centered">
+          <button class="create-workspace-btn">CREATE WORKSPACE</button>
+        </div>
+
+        <div class="specs">
+          <div class="spec-item">{{ specs.cpus }} CPUs</div>
+          <div class="spec-item">{{ specs.ram }} GB RAM</div>
+          <div class="spec-item">+ {{ specs.gpus }} GPU(s)</div>
+        </div>
+
+        <div class="installed-software-toggle">
+          Installed Software <span class="chev">▾</span>
         </div>
       </div>
     </main>

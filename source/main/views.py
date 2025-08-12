@@ -1,11 +1,4 @@
-"""
-View functions for the Ada mock project.
-
-Each view renders a template that approximates the look of the
-corresponding page in the original system. Since this project is a
-mock, these views intentionally avoid any business logic or
-authentication checks.
-"""
+import random
 
 from django.http import HttpRequest, HttpResponse  # type: ignore
 from django.shortcuts import render  # type: ignore
@@ -71,3 +64,31 @@ def instruments(request: HttpRequest, source: str) -> HttpResponse:
     # Choose template based on facility; reuse same layout but lists differ.
     template_name = 'instruments_isis.html' if source_key == 'isis' else 'instruments_clf.html'
     return render(request, template_name, context)
+
+def _stable_specs_for(instrument_name: str) -> dict:
+    """
+    Produce a stable 'random' spec for the given instrument by seeding
+    the RNG with the instrument name. This keeps values the same across reloads.
+    """
+    r = random.Random(instrument_name.lower())
+    cpus = r.choice([4, 8, 12, 16, 24, 32, 48, 64])
+    ram  = r.choice([16, 24, 32, 48, 64, 96, 128, 192, 256])  # GB
+    gpus = r.choice([0, 1, 1, 2, 2, 4])  # weight toward 1–2 GPUs
+    return {"cpus": cpus, "ram": ram, "gpus": gpus}
+
+def instrument_detail(request, source: str, instrument: str):
+    """
+    Detail page for a chosen instrument. Specs are stable per instrument.
+    """
+    source_key = source.lower()
+    context = {
+        "source": source,
+        "source_title": {
+            "isis": "ISIS Data Analysis",
+            "clf": "Central Laser Facility Data Analysis",
+            "diamond": "Diamond Data Analysis",
+        }.get(source_key, f"{source.title()} Data Analysis"),
+        "instrument_name": instrument,
+        "specs": _stable_specs_for(instrument),
+    }
+    return render(request, "instrument_detail.html", context)
