@@ -6,6 +6,9 @@
 
 ## Real time configuration changes
 Uses Django Channels
+We keep data loaded in various models
+We change MVT relationships using admin panel
+We push these relatioships using websockets
 
 
 
