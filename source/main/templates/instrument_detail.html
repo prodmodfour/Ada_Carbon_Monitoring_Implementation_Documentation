@@ -49,8 +49,14 @@
         </div>
 
         <div class="specs">
-          <div class="spec-item">{{ specs.cpus }} CPUs</div>
-          <div class="spec-item">{{ specs.ram }} GB RAM</div>
+          <div class="spec-item">
+            <img class="spec-icon" src="{% static 'images/cpu.png' %}" alt="CPU">
+            <span>{{ specs.cpus }} CPUs</span>
+          </div>
+          <div class="spec-item">
+            <img class="spec-icon" src="{% static 'images/ram.png' %}" alt="RAM">
+            <span>{{ specs.ram }} GB RAM</span>
+          </div>
           <div class="spec-item">+ {{ specs.gpus }} GPU(s)</div>
         </div>
 
