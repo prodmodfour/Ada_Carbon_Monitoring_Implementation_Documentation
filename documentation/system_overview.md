@@ -30,27 +30,6 @@
 
 ## Data Display Modules
 
-These are charts or figures that can easily be plugged into the existing. We catalogue these with dummy data in data_display_catalogue.html.
-I will eventually feed in real data when they are plugged into the other pages
-
-Current catalogue:
-Virtual Capacity Curves (Electricity view and carbon view)
-Carbon Intensity Forecast
-Estimated eletricity usage of a project over x time period (Selectable data range or day, month, year). This uses TDP calculations
-    Carbon footprint view
-    carbon equivalency metrics
-SCI Score
-GHG Score
-
-Workspace figures
-    Idle Usage Counter per workspace
-    Best time in work hours (8 am to 5 PM) to use in terms of carbon intensity
-
-Service figures
-Estimated eletricity usage of the service over x time period (Selectable data range or day, month, year). This uses TDP calculations
-    Carbon footprint view
-    carbon equivalency metrics
-
 ## Real time configuration changes
 Uses Django Channels
 We keep data loaded in various models
