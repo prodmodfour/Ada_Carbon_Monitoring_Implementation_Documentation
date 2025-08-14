@@ -34,11 +34,13 @@
         <img src="{% static 'images/back_arrow.png' %}" alt="Back"> Back
       </a>
 
+      <div class="instrument-detail-center">
       <div class="instrument-detail-card">
         <div class="instrument-detail-header">
           <img src="{% static 'images/icon_new_workspace.png' %}" alt="Instrument" class="analysis-card-icon">
           <span>{{ instrument_name }}</span>
         </div>
+        
 
         <p class="instrument-detail-desc">
           This Workspace has been configured for {{ instrument_name }} experiments.
@@ -63,6 +65,7 @@
         <div class="installed-software-toggle">
           Installed Software <span class="chev">▾</span>
         </div>
+      </div>
       </div>
     </main>
   </div>
