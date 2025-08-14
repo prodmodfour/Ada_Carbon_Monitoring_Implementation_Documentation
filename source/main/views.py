@@ -112,9 +112,3 @@ def instrument_detail(request, source: str, instrument: str):
         "specs": _stable_specs_for(instrument),
     }
     return render(request, "instrument_detail.html", context)
-
-def data_display_catalogue(request):
-    # dummy-only page; all data generated in template JS
-    return render(request, 'data_display_catalogue.html', {
-        "page_title": "Data Display Catalogue"
-    })
