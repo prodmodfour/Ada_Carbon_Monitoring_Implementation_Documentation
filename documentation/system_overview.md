@@ -1,6 +1,32 @@
 # Presentation
 
 ## Ada Platform Recreation in **Django**
+* **Pages & Flow**
+
+  * Instrument lists: `instruments_clf` and `instruments_isis`
+  * New **Instrument Detail** route: `/analysis/<source>/instruments/<instrument>/`
+  * “Create Workspace” posts to detail, then redirects back to **Analysis**
+
+* **Instrument Detail UI**
+
+  * Card header shows **{Chosen Instrument}**
+  * Stable “random” specs per instrument (CPUs, RAM, GPUs) seeded by name
+  * CPU/RAM icons left of spec text; full card centered
+  * “Installed Software” dropdown is non-functional (visual only)
+
+* **Workspaces**
+
+  * Clicking **Create Workspace** adds a workspace to session storage
+  * Owner fixed to **Ashraf Hussain**
+  * Titles auto-increment: **Workspace 1**, **Workspace 2**, …
+  * Workspaces rendered as cards on **Analysis** (desktop + Jupyter previews, disabled Start button)
+
+* **Tech Notes**
+
+  * Session-backed storage per source (`ISIS`, `CLF`); migrate sessions or use signed-cookie backend
+  * Minimal CSS added for centering and workspace card layout
+  * New/updated templates: `instrument_detail.html`, `analysis.html`, and instrument list links to detail
+
 
 ## Data Display Modules
 
