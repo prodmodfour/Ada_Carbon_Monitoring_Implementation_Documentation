@@ -402,3 +402,111 @@ html, body {
   justify-self: center;    
   margin: 0 auto;          
 }
+
+
+/* Workspaces section */
+.workspaces-heading {
+  margin: 24px 0 12px;
+  color: #546e7a;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.workspace-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 960px;
+}
+
+/* Single workspace card */
+.workspace-card {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 16px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.workspace-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.workspace-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #37474f;
+}
+
+.workspace-card-gear { color: #90a4ae; }
+
+.workspace-owner {
+  margin: 6px 0 10px;
+  color: #607d8b;
+  font-size: 14px;
+}
+
+/* Preview area (two side-by-side panels) */
+.workspace-previews {
+  display: flex;
+  gap: 16px;
+  margin: 10px 0;
+}
+
+.preview-box {
+  flex: 1 1 0;
+  height: 210px;
+  background: #f7f7f7;
+  border: 1px solid #e0e0e0;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.preview-label {
+  color: #9e9e9e;
+  font-size: 13px;
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+}
+
+.preview-toolbar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.kernel-select {
+  padding: 6px 8px;
+  font-size: 12px;
+  border: 1px solid #e0e0e0;
+  background: #fff;
+  border-radius: 4px;
+  color: #616161;
+}
+
+/* Actions */
+.workspace-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.start-btn {
+  border: 1px solid #e0e0e0;
+  background: #fff;
+  border-radius: 4px;
+  padding: 8px 14px;
+  font-size: 12px;
+  cursor: not-allowed; 
+  color: #616161;
+}

@@ -2,53 +2,99 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{{ source_title }}</title>
-  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}" />
 </head>
 <body>
   <!-- Top navigation bar with dynamic title -->
   <header class="top-nav">
     <div class="left">
-      <img src="{% static 'images/small_atom.png' %}" alt="Atom" class="small-icon">
+      <img src="{% static 'images/small_atom.png' %}" alt="Atom" class="small-icon" />
       <span class="analysis-title">{{ source_title }}</span>
     </div>
     <div class="right">
       <span class="logout-link">Logout</span>
     </div>
   </header>
+
   <div class="page-body">
-    <!-- Sidebar navigation -->
+    <!-- Sidebar -->
     <nav class="sidebar">
       <ul>
-        <li><img src="{% static 'images/icon_workspaces.png' %}" alt="">Workspaces</li>
-        <li><img src="{% static 'images/icon_data.png' %}" alt="">Data</li>
-        <li><img src="{% static 'images/icon_experiments.png' %}" alt="">Experiments</li>
-        <li><img src="{% static 'images/icon_question.png' %}" alt="">Help</li>
-        <li><img src="{% static 'images/icon_info.png' %}" alt="">About</li>
+        <li><img src="{% static 'images/icon_workspaces.png' %}" alt="" />Workspaces</li>
+        <li><img src="{% static 'images/icon_data.png' %}" alt="" />Data</li>
+        <li><img src="{% static 'images/icon_experiments.png' %}" alt="" />Experiments</li>
+        <li><img src="{% static 'images/icon_question.png' %}" alt="" />Help</li>
+        <li><img src="{% static 'images/icon_info.png' %}" alt="" />About</li>
       </ul>
     </nav>
+
+    <!-- Main content -->
     <main class="content">
-      <!-- New workspace call to action -->
-      <div class="analysis-card">
+
+      <!-- Hero card: New Workspace -->
+      <div class="analysis-card" style="margin-bottom: 18px;">
         <div class="analysis-card-left">
-          <img src="{% static 'images/icon_new_workspace.png' %}" alt="New Workspace" class="analysis-card-icon">
+          <img src="{% static 'images/icon_new_workspace.png' %}" alt="" class="analysis-card-icon" />
           <div>
             <div class="analysis-card-title">New Workspace</div>
-            <div class="analysis-card-subtitle">Workspaces provide you with software and compute resources to analyse your experiment data</div>
+            <div class="analysis-card-subtitle">
+              Workspaces provide you with software and compute resources to analyse your experiment data
+            </div>
           </div>
         </div>
         <div class="analysis-card-right">
           <!-- Clicking the arrow navigates to the instrument selection page for the current source -->
           <a href="{% url 'instruments' source=source %}">
-            <img src="{% static 'images/icon_arrow.png' %}" alt="Go">
+            <img src="{% static 'images/icon_arrow.png' %}" alt="Go" />
           </a>
         </div>
       </div>
-      <p class="no-workspaces-message">
-        You don't seem to have any workspaces, create a new workspace to get started.
-      </p>
+
+      <!-- Workspace list -->
+      {% if workspaces %}
+        <h2 class="workspaces-heading">Your Workspaces</h2>
+        <div class="workspace-list">
+          {% for ws in workspaces %}
+            <div class="workspace-card">
+              <div class="workspace-card-top">
+                <div class="workspace-card-title">
+                  <img src="{% static 'images/icon_new_workspace.png' %}" alt="" class="analysis-card-icon" />
+                  <span>{{ ws.title }}</span>
+                </div>
+                <div class="workspace-card-gear">⚙</div>
+              </div>
+
+              <div class="workspace-owner">Ashraf Hussain</div>
+
+              <div class="workspace-previews">
+                <div class="preview-box">
+                  <div class="preview-label">Desktop</div>
+                </div>
+                <div class="preview-box">
+                  <div class="preview-toolbar">
+                    <select class="kernel-select" disabled>
+                      <option>Jupyter</option>
+                    </select>
+                  </div>
+                  <div class="preview-label">Jupyter</div>
+                </div>
+              </div>
+
+              <div class="workspace-actions">
+                <button class="start-btn" disabled>START JUPYTER</button>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="no-workspaces-message">
+          You don't seem to have any workspaces, create a new workspace to get started.
+        </p>
+      {% endif %}
+
     </main>
   </div>
 </body>

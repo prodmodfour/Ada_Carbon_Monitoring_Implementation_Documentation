@@ -1,7 +1,32 @@
 import random
 
-from django.http import HttpRequest, HttpResponse  # type: ignore
-from django.shortcuts import render  # type: ignore
+from django.http import HttpRequest, HttpResponse  
+from django.shortcuts import render, redirect
+from django.utils import timezone
+
+def _ws_key(source: str) -> str:
+    # keep workspaces separate per source (isis, clf, ...)
+    return f"workspaces::{source.lower()}"
+
+def _get_workspaces(request, source: str):
+    return request.session.get(_ws_key(source), [])
+
+def _save_workspaces(request, source: str, items):
+    request.session[_ws_key(source)] = items
+    request.session.modified = True
+
+def _add_workspace(request, source: str, instrument: str):
+    items = _get_workspaces(request, source)
+    next_num = len(items) + 1
+    items.append({
+        "title": f"Workspace {next_num}",
+        "owner": "Ashraf Hussain",
+        "instrument": instrument,
+        "created_at": timezone.now().isoformat(),
+        # you can add status, kernel, etc. later
+    })
+    _save_workspaces(request, source, items)
+
 
 
 def home(request: HttpRequest) -> HttpResponse:
@@ -10,23 +35,18 @@ def home(request: HttpRequest) -> HttpResponse:
 
 
 def analysis(request: HttpRequest, source: str) -> HttpResponse:
-    """
-    Render the generic analysis page.
-
-    The ``source`` parameter determines the heading displayed on the
-    page. If an unrecognised source is provided, the heading uses the
-    raw value.
-    """
-    title_map = {
-        'ISIS': 'ISIS Data Analysis',
-        'CLF': 'Central Laser Facility Data Analysis',
-        'Diamond': 'Diamond Data Analysis',
-    }
+    source_key = source.lower()
     context = {
-        'source_title': title_map.get(source, f'{source} Data Analysis'),
+        'source_title': {
+            'isis': 'ISIS Data Analysis',
+            'clf': 'Central Laser Facility Data Analysis',
+            'diamond': 'Diamond Data Analysis',
+        }.get(source_key, f'{source.title()} Data Analysis'),
         'source': source,
+        'workspaces': _get_workspaces(request, source),  # NEW
     }
     return render(request, 'analysis.html', context)
+
 
 
 def instruments(request: HttpRequest, source: str) -> HttpResponse:
@@ -66,10 +86,7 @@ def instruments(request: HttpRequest, source: str) -> HttpResponse:
     return render(request, template_name, context)
 
 def _stable_specs_for(instrument_name: str) -> dict:
-    """
-    Produce a stable 'random' spec for the given instrument by seeding
-    the RNG with the instrument name. This keeps values the same across reloads.
-    """
+
     r = random.Random(instrument_name.lower())
     cpus = r.choice([4, 8, 12, 16, 24, 32, 48, 64])
     ram  = r.choice([16, 24, 32, 48, 64, 96, 128, 192, 256])  # GB
@@ -77,9 +94,12 @@ def _stable_specs_for(instrument_name: str) -> dict:
     return {"cpus": cpus, "ram": ram, "gpus": gpus}
 
 def instrument_detail(request, source: str, instrument: str):
-    """
-    Detail page for a chosen instrument. Specs are stable per instrument.
-    """
+    # Only redirect after a real "Create Workspace" POST
+    if request.method == "POST" and request.POST.get("create_workspace") == "1":
+        _add_workspace(request, source, instrument)
+        return redirect('analysis', source=source)
+
+    # GET -> render the detail page
     source_key = source.lower()
     context = {
         "source": source,

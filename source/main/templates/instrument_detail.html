@@ -47,7 +47,11 @@
         </p>
 
         <div class="centered">
-          <button class="create-workspace-btn">CREATE WORKSPACE</button>
+          <form method="post" action="{% url 'instrument_detail' source instrument_name %}">
+            {% csrf_token %}
+            <input type="hidden" name="create_workspace" value="1">
+            <button class="create-workspace-btn" type="submit">CREATE WORKSPACE</button>
+          </form>
         </div>
 
         <div class="specs">
