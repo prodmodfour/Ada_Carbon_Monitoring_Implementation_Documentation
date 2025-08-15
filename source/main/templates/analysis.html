@@ -52,209 +52,136 @@
           </a>
         </div>
       </div>
-        <!-- Carbon Intensity Forecast (GB) -->
-  <section class="ci-card">
-    <div class="ci-header">
-      <div>
-        <div class="ci-title">Carbon Intensity Forecast (GB)</div>
-        <div class="ci-caption">
-          All times local. <span>Source: GB Carbon Intensity API.</span>
-          <span id="ciRefreshed" aria-live="polite"></span>
+
+      <!-- Carbon Intensity Forecast (GB) -->
+      <section class="ci-card">
+        <div class="ci-header">
+          <div>
+            <div class="ci-title">Carbon Intensity Forecast (GB)</div>
+            <div class="ci-caption">
+              All times local. <span>Source: GB Carbon Intensity API.</span>
+              <span id="ciRefreshed" aria-live="polite"></span>
+            </div>
+          </div>
+
+          <div class="ci-controls">
+            <button class="pill active" data-range="working" aria-pressed="true" title="08:00–17:00">
+              Working day (8:00–17:00)
+            </button>
+            <button class="pill" data-range="24h" aria-pressed="false">Next 24 hours</button>
+            <button class="pill" data-range="48h" aria-pressed="false">Next 48 hours</button>
+            <button class="pill" data-range="custom" aria-pressed="false">Custom</button>
+
+            <div id="ciCustom" class="ci-custom hidden" aria-hidden="true">
+              <label>
+                From
+                <input type="datetime-local" id="ciFrom">
+              </label>
+              <label>
+                To
+                <input type="datetime-local" id="ciTo">
+              </label>
+              <button id="ciApply" class="pill">Apply</button>
+            </div>
+          </div>
+          <button id="ciHelpBtn" class="ci-help-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="ciHelp" title="What is this?">?</button>
         </div>
-      </div>
 
-      <div class="ci-controls">
-        <button class="pill active" data-range="working" aria-pressed="true" title="08:00–17:00">
-          Working day (8:00–17:00)
-        </button>
-        <button class="pill" data-range="24h" aria-pressed="false">Next 24 hours</button>
-        <button class="pill" data-range="48h" aria-pressed="false">Next 48 hours</button>
-        <button class="pill" data-range="custom" aria-pressed="false">Custom</button>
-
-        <div id="ciCustom" class="ci-custom hidden" aria-hidden="true">
-          <label>
-            From
-            <input type="datetime-local" id="ciFrom">
-          </label>
-          <label>
-            To
-            <input type="datetime-local" id="ciTo">
-          </label>
-          <button id="ciApply" class="pill">Apply</button>
+        <div class="ci-popover hidden" id="ciHelp" role="dialog" aria-modal="true" aria-label="About Carbon Intensity Forecast (GB)">
+          <button class="ci-popover-close" id="ciHelpClose" aria-label="Close">×</button>
+          <h4>What am I seeing?</h4>
+          <ul class="ci-popover-list">
+            <li><strong>Data:</strong> half-hourly <em>forecast</em> of GB grid carbon intensity (gCO₂/kWh).</li>
+            <li><strong>Times:</strong> shown in your local time; the API provides UTC which we convert.</li>
+            <li><strong>Ranges:</strong> Working day (08:00–17:00), next 24h, next 48h, or a custom range
+              (capped at 48h since longer forecasts are less accurate).</li>
+            <li><strong>Best 3-hour window:</strong> the light green band marks the lowest contiguous 3 hours
+              (6 half-hour points) by average gCO₂/kWh.</li>
+            <li><strong>Now marker:</strong> a dashed line appears if “now” falls in the selected range.</li>
+            <li><strong>Working day rule:</strong> before 08:00 → today; after 17:00 → tomorrow (weekends included).</li>
+          </ul>
+          <p class="ci-popover-foot">Source: GB Carbon Intensity API.</p>
         </div>
-      </div>
-      <button id="ciHelpBtn" class="ci-help-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="ciHelp" title="What is this?">?</button>
-    </div>
 
-    <div class="ci-popover hidden" id="ciHelp" role="dialog" aria-modal="true" aria-label="About Carbon Intensity Forecast (GB)">
-      <button class="ci-popover-close" id="ciHelpClose" aria-label="Close">×</button>
-      <h4>What am I seeing?</h4>
-      <ul class="ci-popover-list">
-        <li><strong>Data:</strong> half-hourly <em>forecast</em> of GB grid carbon intensity (gCO₂/kWh).</li>
-        <li><strong>Times:</strong> shown in your local time; the API provides UTC which we convert.</li>
-        <li><strong>Ranges:</strong> Working day (08:00–17:00), next 24h, next 48h, or a custom range
-          (capped at 48h since longer forecasts are less accurate).</li>
-        <li><strong>Best 3-hour window:</strong> the light green band marks the lowest contiguous 3 hours
-          (6 half-hour points) by average gCO₂/kWh.</li>
-        <li><strong>Now marker:</strong> a dashed line appears if “now” falls in the selected range.</li>
-        <li><strong>Working day rule:</strong> before 08:00 → today; after 17:00 → tomorrow (weekends included).</li>
-      </ul>
-      <p class="ci-popover-foot">Source: GB Carbon Intensity API.</p>
-    </div>
-    
+        <div class="ci-chart">
+          <canvas id="ciForecastChart"></canvas>
+        </div>
 
-    <div class="ci-chart">
-      <canvas id="ciForecastChart"></canvas>
-    </div>
+        <div class="ci-note" id="ciNote" role="note"></div>
+        <div class="ci-error hidden" id="ciError" role="alert">
+          <span id="ciErrorMsg">Unable to load forecast.</span>
+          <button id="ciRetry" class="pill">Retry</button>
+        </div>
+      </section>
 
-    <div class="ci-note" id="ciNote" role="note"></div>
-    <div class="ci-error hidden" id="ciError" role="alert">
-      <span id="ciErrorMsg">Unable to load forecast.</span>
-      <button id="ciRetry" class="pill">Retry</button>
-    </div>
-  </section>
+      <!-- Estimated Electricity Usage (Project) -->
+      <section class="usage-card">
+        <div class="usage-head">
+          <div>
+            <div class="usage-title">Estimated Electricity Usage (Project)</div>
+          </div>
+          <div class="usage-controls">
+            <div class="seg">
+              <button class="seg-btn active" data-view="elec" aria-pressed="true">Electricity</button>
+              <button class="seg-btn" data-view="carbon" aria-pressed="false">Carbon</button>
+            </div>
+            <div class="seg">
+              <button class="seg-btn active" data-range="day" aria-pressed="true">Day</button>
+              <button class="seg-btn" data-range="month" aria-pressed="false">Month</button>
+              <button class="seg-btn" data-range="year" aria-pressed="false">Year</button>
+            </div>
+            <button id="usageHelpBtn" class="usage-help-btn"
+              aria-haspopup="dialog" aria-expanded="false"
+              aria-controls="usageHelp" title="What is this?">?</button>
+          </div>
+        </div>
 
+        <div class="usage-popover hidden" id="usageHelp" role="dialog"
+             aria-modal="true" aria-label="About Estimated Electricity Usage (Project)">
+          <button class="usage-popover-close" id="usageHelpClose" aria-label="Close">×</button>
 
-<!-- Estimated Electricity Usage (Project) -->
-<section class="usage-card">
-  <div class="usage-head">
-    <div>
-      <div class="usage-title">Estimated Electricity Usage (Project)</div>
-    </div>
-    <div class="usage-controls">
-      <div class="seg">
-        <button class="seg-btn active" data-view="elec" aria-pressed="true">Electricity</button>
-        <button class="seg-btn" data-view="carbon" aria-pressed="false">Carbon</button>
-      </div>
-      <div class="seg">
-        <button class="seg-btn active" data-range="day" aria-pressed="true">Day</button>
-        <button class="seg-btn" data-range="month" aria-pressed="false">Month</button>
-        <button class="seg-btn" data-range="year" aria-pressed="false">Year</button>
-      </div>
-      <button id="usageHelpBtn" class="usage-help-btn"
-        aria-haspopup="dialog" aria-expanded="false"
-        aria-controls="usageHelp" title="What is this?">?</button>
-    </div>
-  </div>
-  <div class="usage-popover hidden" id="usageHelp" role="dialog"
-  aria-modal="true" aria-label="About Estimated Electricity Usage (Project)">
-<button class="usage-popover-close" id="usageHelpClose" aria-label="Close">×</button>
+          <h4>How we estimate electricity (TDP-based)</h4>
+          <ol class="usage-popover-list">
+            <li><strong>Component power (Watts)</strong> = CPUs × CPU&nbsp;TDP + GPUs × GPU&nbsp;TDP + RAM&nbsp;W + Other&nbsp;W.</li>
+            <li><strong>Utilization profile</strong> scales those Watts per time bin (hour/day/month).</li>
+            <li><strong>Energy (kWh)</strong> = Watts ÷ 1000 × duration (hours), summed across bins.</li>
+            <li><strong>Carbon (kg&nbsp;CO₂e)</strong> = Energy × grid carbon intensity (g&nbsp;CO₂/kWh ÷ 1000), using location-based factors.</li>
+          </ol>
 
-<h4>How we estimate electricity (TDP-based)</h4>
-<ol class="usage-popover-list">
- <li><strong>Component power (Watts)</strong> = CPUs × CPU&nbsp;TDP + GPUs × GPU&nbsp;TDP + RAM&nbsp;W + Other&nbsp;W.</li>
- <li><strong>Utilization profile</strong> scales those Watts per time bin (hour/day/month).</li>
- <li><strong>Energy (kWh)</strong> = Watts ÷ 1000 × duration (hours), summed across bins.</li>
- <li><strong>Carbon (kg&nbsp;CO₂e)</strong> = Energy × grid carbon intensity (g&nbsp;CO₂/kWh ÷ 1000), using location-based factors.</li>
-</ol>
+          <h4>Why use TDP?</h4>
+          <p>When direct metering isn’t available, many tools estimate power from manufacturer TDPs combined with utilization (often using conservative scaling). See:</p>
+          <ul class="usage-sources">
+            <li><a href="https://mlco2.github.io/codecarbon/methodology.html" target="_blank" rel="noopener">CodeCarbon methodology (TDP lookup & fallback)</a></li>
+            <li><a href="https://github.com/Green-Software-Foundation/sci-data-guidance/blob/dev/use-case-submissions/msft-eShoppen.md" target="_blank" rel="noopener">Green Software Foundation SCI data guidance (TDP for components)</a></li>
+            <li><a href="https://www.etsy.com/codeascraft/cloud-jewels-estimating-kwh-in-the-cloud" target="_blank" rel="noopener">Etsy Cloud Jewels (kWh estimation in the cloud)</a></li>
+            <li><a href="https://www.cloudcarbonfootprint.org/docs/methodology/" target="_blank" rel="noopener">Cloud Carbon Footprint (estimation methodology)</a></li>
+            <li><a href="https://carbon-intensity.github.io/api-definitions/" target="_blank" rel="noopener">GB Carbon Intensity API (g&nbsp;CO₂/kWh, forecasts)</a></li>
+            <li><a href="https://boavizta.org/en/blog/calculettes-carbone-clouds-providers" target="_blank" rel="noopener">Boavizta — prefer location-based factors</a></li>
+          </ul>
+        </div>
 
-<h4>Why use TDP?</h4>
-<p>When direct metering isn’t available, many tools estimate power from manufacturer TDPs combined with utilization (often using conservative scaling). See:</p>
-<ul class="usage-sources">
- <li><a href="https://mlco2.github.io/codecarbon/methodology.html" target="_blank" rel="noopener">
-   CodeCarbon methodology (TDP lookup & fallback)</a></li>
- <li><a href="https://github.com/Green-Software-Foundation/sci-data-guidance/blob/dev/use-case-submissions/msft-eShoppen.md" target="_blank" rel="noopener">
-   Green Software Foundation SCI data guidance (TDP for components)</a></li>
- <li><a href="https://www.etsy.com/codeascraft/cloud-jewels-estimating-kwh-in-the-cloud" target="_blank" rel="noopener">
-   Etsy Cloud Jewels (kWh estimation in the cloud)</a></li>
- <li><a href="https://www.cloudcarbonfootprint.org/docs/methodology/" target="_blank" rel="noopener">
-   Cloud Carbon Footprint (estimation methodology)</a></li>
- <li><a href="https://carbon-intensity.github.io/api-definitions/" target="_blank" rel="noopener">
-   GB Carbon Intensity API (g&nbsp;CO₂/kWh, forecasts)</a></li>
- <li><a href="https://boavizta.org/en/blog/calculettes-carbone-clouds-providers" target="_blank" rel="noopener">
-   Boavizta — prefer location-based factors</a></li>
-</ul>
-</div>
+        <div class="usage-body">
+          <div class="usage-chart">
+            <canvas id="usageChart"></canvas>
+          </div>
+          <aside class="usage-metrics">
+            <div class="metric-card">
+              <div class="metric-title" id="metricTitle">Electricity equivalency</div>
+              <ul class="metric-list" id="metricList"><!-- filled by JS --></ul>
+            </div>
+            <div class="metric-card">
+              <div class="metric-title">Totals</div>
+              <ul class="metric-list" id="metricTotals"><!-- filled by JS --></ul>
+            </div>
+          </aside>
+        </div>
 
-  <div class="usage-body">
-    <div class="usage-chart">
-      <canvas id="usageChart"></canvas>
-    </div>
-    <aside class="usage-metrics">
-      <div class="metric-card">
-        <div class="metric-title" id="metricTitle">Electricity equivalency</div>
-        <ul class="metric-list" id="metricList">
-          <!-- filled by JS -->
-        </ul>
-      </div>
-      <div class="metric-card">
-        <div class="metric-title">Totals</div>
-        <ul class="metric-list" id="metricTotals">
-          <!-- filled by JS -->
-        </ul>
-      </div>
-    </aside>
-  </div>
-
-  <div class="usage-note" id="usageNote"></div>
-  <div class="ci-error hidden" id="usageErr" role="alert">
-    <span id="usageErrMsg">Unable to load usage.</span>
-    <button id="usageRetry" class="pill">Retry</button>
-  </div>
-</section>
-
-<!-- SCI Score -->
-<section class="sci-card">
-  <div class="sci-head">
-    <div>
-      <div class="sci-title">SCI Score</div>
-      <div class="sci-caption">Lower is better. Functional unit: compute-hour (kg CO₂e / FU).</div>
-    </div>
-    <div class="sci-controls">
-      <div class="seg">
-        <button class="seg-btn active" data-sci-range="day" aria-pressed="true">Day</button>
-        <button class="seg-btn" data-sci-range="month" aria-pressed="false">Month</button>
-        <button class="seg-btn" data-sci-range="year" aria-pressed="false">Year</button>
-      </div>
-      <button id="sciHelpBtn" class="sci-help-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="sciHelp" title="What is SCI?">?</button>
-    </div>
-  </div>
-
-  <!-- Help popover -->
-  <div class="sci-popover hidden" id="sciHelp" role="dialog" aria-modal="true" aria-label="About SCI Score">
-    <button class="sci-popover-close" id="sciHelpClose" aria-label="Close">×</button>
-    <h4>What is SCI?</h4>
-    <p>The Software Carbon Intensity (SCI) score expresses carbon per functional unit (FU). In this mock, FU = one compute-hour.</p>
-    <ol class="sci-popover-list">
-      <li><strong>Operational</strong> = electricity (kWh) × grid carbon intensity (g/kWh ÷ 1000).</li>
-      <li><strong>Embodied</strong> = manufacturing/infra emissions amortized over hardware lifetime (kg ÷ hours).</li>
-      <li><strong>SCI</strong> = Operational + Embodied (kg CO₂e / FU).</li>
-    </ol>
-    <p>You can adjust TDP, embodied values, lifetime, or CI factor in the API later for more accurate scoring.</p>
-    <p class="sci-popover-foot">Based on the Green Software Foundation’s SCI approach.</p>
-  </div>
-
-  <div class="sci-body">
-    <div class="sci-chart">
-      <canvas id="sciChart"></canvas>
-      <div class="sci-center" id="sciCenter">—</div>
-    </div>
-
-    <aside class="sci-metrics">
-      <div class="metric-card">
-        <div class="metric-title">Breakdown (kg CO₂e / FU)</div>
-        <ul class="metric-list">
-          <li>Operational: <strong id="sciOp">—</strong></li>
-          <li>Embodied: <strong id="sciEmb">—</strong></li>
-        </ul>
-      </div>
-      <div class="metric-card">
-        <div class="metric-title">Assumptions</div>
-        <ul class="metric-list" id="sciAssump">
-          <!-- filled by JS -->
-        </ul>
-      </div>
-    </aside>
-  </div>
-
-  <div class="sci-note" id="sciNote"></div>
-  <div class="ci-error hidden" id="sciErr" role="alert">
-    <span id="sciErrMsg">Unable to load SCI score.</span>
-    <button id="sciRetry" class="pill">Retry</button>
-  </div>
-</section>
-
-
+        <div class="usage-note" id="usageNote"></div>
+        <div class="ci-error hidden" id="usageErr" role="alert">
+          <span id="usageErrMsg">Unable to load usage.</span>
+          <button id="usageRetry" class="pill">Retry</button>
+        </div>
+      </section>
 
       <!-- Workspace list -->
       {% if workspaces %}
@@ -303,24 +230,21 @@
     </main>
   </div>
 
-
   <!-- Chart.js CDN -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<script>
+  <!-- Carbon Intensity Forecast script -->
+  <script>
 (() => {
   // ===== Utilities =====
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
-  // Format a Date to 'YYYY-MM-DDTHH:MMZ' (UTC minutes precision)
   function toIsoUTCMinute(d) {
     const pad = (n) => String(n).padStart(2, '0');
     return d.getUTCFullYear() + '-' + pad(d.getUTCMonth()+1) + '-' + pad(d.getUTCDate())
       + 'T' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + 'Z';
   }
-
-  // Round up to the next :00 / :30 boundary (local)
   function nextHalfHour(dt) {
     const d = new Date(dt);
     const m = d.getMinutes();
@@ -330,37 +254,26 @@
     d.setSeconds(0, 0);
     return d;
   }
-
-  // Working day window (local) per your rules:
-  // before 08:00 => today 08:00–17:00; after 17:00 => tomorrow 08:00–17:00; Sat/Sun allowed as working days
   function workingDayWindow(nowLocal) {
     const base = new Date(nowLocal);
     const h = base.getHours();
     const day = new Date(base);
-    if (h >= 17) day.setDate(day.getDate() + 1); // roll to tomorrow
-    // else before 08:00 or within the day -> keep today
+    if (h >= 17) day.setDate(day.getDate() + 1);
     const from = new Date(day); from.setHours(8,0,0,0);
     const to   = new Date(day); to.setHours(17,0,0,0);
     return { from, to };
   }
-
-  // Cap to 48 hours; return possibly trimmed range and flag
   function cap48(from, to) {
     const maxMs = 48 * 60 * 60 * 1000;
     let capped = false;
     if ((to - from) > maxMs) { to = new Date(from.getTime() + maxMs); capped = true; }
     return { from, to, capped };
   }
-
-  // Build request URL
   function buildUrl(from, to) {
-    // send to our Django proxy (which calls the GB API server-side)
     const f = toIsoUTCMinute(new Date(from));
     const t = toIsoUTCMinute(new Date(to));
     return `/api/ci?from=${encodeURIComponent(f)}&to=${encodeURIComponent(t)}`
   }
-
-  // Compute best contiguous 3-hour window (6 half-hour slots)
   function best3hWindow(points) {
     if (!points || points.length < 6) return null;
     let best = { i: 0, avg: Infinity };
@@ -372,7 +285,7 @@
       const avg = sum / 6;
       if (avg < best.avg) best = { i: i - 5, avg };
     }
-    return best; // {i, avg}
+    return best;
   }
 
   // ===== DOM refs =====
@@ -392,37 +305,33 @@
   let helpOutsideListener = null;
   let helpEscListener = null;
 
-
   // ===== Chart state =====
   let chart;
   const state = {
-    labels: [],     // e.g., "13:00", "13:30", ...
-    values: [],     // forecast gCO2/kWh
+    labels: [],
+    values: [],
     from: null,
     to: null,
-    band: null,     // [startIndex, endIndex] inclusive for best 3h
-    nowIndex: null, // index for "Now" marker or null
+    band: null,
+    nowIndex: null,
   };
 
-  // Highlight plugin: draw the best 3h band + "Now" line
   const ciHighlightPlugin = {
     id: 'ciHighlight',
-    afterDatasetsDraw(c, args, opts) {
+    afterDatasetsDraw(c) {
       const { ctx, chartArea: {left, right, top, bottom}, scales: {x} } = c;
 
-      // Best 3h band
       if (state.band && state.values.length > 1) {
         const [i0, i1] = state.band;
         const x0 = x.getPixelForValue(i0);
         const x1 = x.getPixelForValue(i1);
         const tick = Math.abs(x.getPixelForValue(1) - x.getPixelForValue(0)) || 10;
         ctx.save();
-        ctx.fillStyle = 'rgba(76, 175, 80, 0.12)'; // subtle green
+        ctx.fillStyle = 'rgba(76, 175, 80, 0.12)';
         ctx.fillRect(x0 - tick/2, top, (x1 - x0) + tick, bottom - top);
         ctx.restore();
       }
 
-      // Now marker
       if (state.nowIndex != null) {
         const xNow = x.getPixelForValue(state.nowIndex);
         ctx.save();
@@ -438,7 +347,6 @@
     }
   };
 
-  // Create or update chart
   function renderChart() {
     const data = {
       labels: state.labels,
@@ -453,7 +361,7 @@
     const options = {
       responsive: true,
       maintainAspectRatio: false,
-      resizeDelay: 150,  // <— add this line
+      resizeDelay: 150,
       plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
       scales: {
         x: { type: 'category', grid: { display: false } },
@@ -474,7 +382,6 @@
     }
   }
 
-  // Populate DOM note: best band + any warnings
   function setNote(from, to, capped, best, labels) {
     const parts = [];
     if (best) {
@@ -488,14 +395,12 @@
     elNote.textContent = parts.join(' · ');
   }
 
-  // Compute labels and indices in local time
   function buildLabels(items) {
     const labels = [];
     const now = new Date();
     state.nowIndex = null;
 
     items.forEach((it, idx) => {
-      // API 'from' timestamps are ISO UTC; parse and render as local "HH:MM"
       const start = new Date(it.from);
       const hh = String(start.getHours()).padStart(2,'0');
       const mm = String(start.getMinutes()).padStart(2,'0');
@@ -506,7 +411,6 @@
     return labels;
   }
 
-  // Fetch & draw for a given local range
   async function loadRange(fromLocal, toLocal, { clamp48 = true } = {}) {
     const { from, to, capped } = clamp48 ? cap48(fromLocal, toLocal) : { from: fromLocal, to: toLocal, capped: false };
     const url = buildUrl(from, to);
@@ -527,7 +431,6 @@
       state.from = from;
       state.to = to;
 
-      // Best 3h window
       const best = best3hWindow(values);
       state.band = best ? [best.i, best.i + 5] : null;
 
@@ -541,15 +444,12 @@
     }
   }
 
-  // ===== Controls =====
   function setActive(btn) {
     $$('.ci-controls .pill').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed','false'); });
     btn.classList.add('active');
     btn.setAttribute('aria-pressed','true');
   }
-
   function initCustomInputs(defaultFrom, defaultTo) {
-    // Convert to local "YYYY-MM-DDTHH:MM"
     const toLocalInput = (d) => {
       const pad = (n) => String(n).padStart(2,'0');
       const dt = new Date(d);
@@ -559,14 +459,12 @@
     elTo.value = toLocalInput(defaultTo);
   }
 
-  // Default: Working day (8–17) per your rules
   function selectWorkingDay() {
     const { from, to } = workingDayWindow(new Date());
     setActive($('[data-range="working"]'));
     elCustomWrap.classList.add('hidden'); elCustomWrap.setAttribute('aria-hidden','true');
     loadRange(from, to, { clamp48: true });
   }
-
   function select24h() {
     const start = nextHalfHour(new Date());
     const end = new Date(start.getTime() + 24*60*60*1000);
@@ -574,7 +472,6 @@
     elCustomWrap.classList.add('hidden'); elCustomWrap.setAttribute('aria-hidden','true');
     loadRange(start, end, { clamp48: true });
   }
-
   function select48h() {
     const start = nextHalfHour(new Date());
     const end = new Date(start.getTime() + 48*60*60*1000);
@@ -582,9 +479,7 @@
     elCustomWrap.classList.add('hidden'); elCustomWrap.setAttribute('aria-hidden','true');
     loadRange(start, end, { clamp48: true });
   }
-
   function selectCustom() {
-    // Default custom range = next 6 hours starting next half hour
     const start = nextHalfHour(new Date());
     const end = new Date(start.getTime() + 6*60*60*1000);
     setActive($('[data-range="custom"]'));
@@ -592,7 +487,6 @@
     initCustomInputs(start, end);
   }
 
-  // Click handlers
   $('.ci-controls').addEventListener('click', (e) => {
     const btn = e.target.closest('.pill');
     if (!btn) return;
@@ -625,315 +519,173 @@
   });
 
   function openHelp(){
-  if (helpOpen) return;
-  elHelp.classList.remove('hidden');
-  elHelpBtn.setAttribute('aria-expanded', 'true');
-  helpOpen = true;
+    if (helpOpen) return;
+    elHelp.classList.remove('hidden');
+    elHelpBtn.setAttribute('aria-expanded', 'true');
+    helpOpen = true;
+    helpOutsideListener = (e) => { if (!elHelp.contains(e.target) && e.target !== elHelpBtn){ closeHelp(); } };
+    helpEscListener = (e) => { if (e.key === 'Escape') closeHelp(); };
+    document.addEventListener('mousedown', helpOutsideListener);
+    document.addEventListener('keydown', helpEscListener);
+  }
+  function closeHelp(){
+    if (!helpOpen) return;
+    elHelp.classList.add('hidden');
+    elHelpBtn.setAttribute('aria-expanded', 'false');
+    helpOpen = false;
+    document.removeEventListener('mousedown', helpOutsideListener);
+    document.removeEventListener('keydown', helpEscListener);
+  }
+  elHelpBtn.addEventListener('click', () => { helpOpen ? closeHelp() : openHelp(); });
+  elHelpClose.addEventListener('click', closeHelp);
 
-  // close on outside click
-  helpOutsideListener = (e) => {
-    if (!elHelp.contains(e.target) && e.target !== elHelpBtn){
-      closeHelp();
-    }
-  };
-  document.addEventListener('mousedown', helpOutsideListener);
-
-  // close on Esc
-  helpEscListener = (e) => {
-    if (e.key === 'Escape') closeHelp();
-  };
-  document.addEventListener('keydown', helpEscListener);
-}
-
-function closeHelp(){
-  if (!helpOpen) return;
-  elHelp.classList.add('hidden');
-  elHelpBtn.setAttribute('aria-expanded', 'false');
-  helpOpen = false;
-  document.removeEventListener('mousedown', helpOutsideListener);
-  document.removeEventListener('keydown', helpEscListener);
-}
-
-elHelpBtn.addEventListener('click', () => {
-  helpOpen ? closeHelp() : openHelp();
-});
-elHelpClose.addEventListener('click', closeHelp);
-
-  // Initial load
   selectWorkingDay();
 })();
-</script>
-<script>
-  (() => {
-    const $  = (s) => document.querySelector(s);
-    const $$ = (s) => Array.from(document.querySelectorAll(s));
-  
-    // --- constants (easy to tweak or move server-side later) ---
-    const CI_G_PER_KWH_DEFAULT = 220;   // used for month/year (or fallback)
-    const CAR_KG_PER_KM        = 0.171; // kg CO2e per km (avg passenger car)
-    const TREE_KG_PER_YEAR     = 21;    // kg CO2e absorbed per tree-year (placeholder)
-    const PARIS_DUBAI_KG       = 1000;  // reference CO2e for an economy seat (placeholder)
-  
-    let currentView = 'elec';   // elec|carbon
-    let currentRange = 'day';   // day|month|year
-    let chart;
-  
-    const elChart = $('#usageChart').getContext('2d');
-    const elMetrics = $('#metricList');
-    const elTotals  = $('#metricTotals');
-    const elTitle   = $('#metricTitle');
-    const elNote    = $('#usageNote');
-    const elErr     = $('#usageErr');
-    const elErrMsg  = $('#usageErrMsg');
-    const elUsageHelpBtn   = document.getElementById('usageHelpBtn');
-    const elUsageHelp      = document.getElementById('usageHelp');
-    const elUsageHelpClose = document.getElementById('usageHelpClose');
-    let usageHelpOpen = false, usageOutside = null, usageEsc = null;
-
-  
-    // helpers
-    function fmt(n, digits=0) { return Number(n).toLocaleString(undefined, { maximumFractionDigits: digits }); }
-    function setSegActive(groupSel, btn){
-      $$(groupSel + ' .seg-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed','false'); });
-      btn.classList.add('active'); btn.setAttribute('aria-pressed','true');
-    }
-  
-    async function fetchUsage(range){
-      const url = `/api/project-usage?range=${encodeURIComponent(range)}`;
-      const res = await fetch(url, { cache: 'no-store' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
-    }
-  
-    function renderChart(labels, series, unitLabel){
-      const data = { labels, datasets: [{ data: series, borderWidth: 0, backgroundColor: 'rgba(66,133,244,0.7)' }] };
-      const options = {
-        responsive: true, maintainAspectRatio: false, resizeDelay: 150,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${fmt(ctx.parsed.y, 2)} ${unitLabel}` } } },
-        scales: {
-          x: { grid: { display: false } },
-          y: { grid: { color: '#eee' }, ticks: { callback: (v) => v } }
-        }
-      };
-      if (chart) { chart.data = data; chart.options = options; chart.update(); }
-      else { chart = new Chart(elChart, { type: 'bar', data, options }); }
-    }
-  
-    function renderMetricsElec(totalKWh){
-      elTitle.textContent = 'Electricity equivalency';
-      elMetrics.innerHTML = `
-        <li><strong>${fmt(totalKWh,2)} kWh</strong> total</li>
-        <li>≈ ${fmt(totalKWh / 0.06)} light-bulb hours (60W)</li>
-        <li>≈ ${fmt(totalKWh / 0.065)} laptop hours (65W)</li>
-        <li>≈ ${fmt(totalKWh / 0.11)} kettle boils (0.11 kWh/boil)</li>
-      `;
-      elTotals.innerHTML = `
-        <li>Average per bin: ${fmt(totalKWh / Math.max(1, last.labels.length), 2)} kWh</li>
-      `;
-    }
-  
-    function renderMetricsCarbon(totalKWh, gPerKWh){
-      const kg = totalKWh * (gPerKWh / 1000);
-      elTitle.textContent = 'Carbon equivalency';
-      elMetrics.innerHTML = `
-        <li><strong>${fmt(kg,0)} kg CO₂e</strong> (at ${gPerKWh} g/kWh)</li>
-        <li>≈ ${fmt(kg / TREE_KG_PER_YEAR,1)} tree-years</li>
-        <li>≈ ${fmt(kg / CAR_KG_PER_KM,0)} car km</li>
-        <li>≈ ${fmt((kg / PARIS_DUBAI_KG) * 100,1)}% of a Paris→Dubai flight</li>
-      `;
-      elTotals.innerHTML = `
-        <li>Total electricity: ${fmt(last.total_kwh,2)} kWh</li>
-        <li>Average per bin: ${fmt(last.total_kwh / Math.max(1,last.labels.length), 2)} kWh</li>
-      `;
-    }
-
-    function openUsageHelp(){
-      if (usageHelpOpen) return;
-      elUsageHelp.classList.remove('hidden');
-      elUsageHelpBtn.setAttribute('aria-expanded','true');
-      usageHelpOpen = true;
-
-      usageOutside = (e) => { if (!elUsageHelp.contains(e.target) && e.target !== elUsageHelpBtn) closeUsageHelp(); };
-      usageEsc = (e) => { if (e.key === 'Escape') closeUsageHelp(); };
-      document.addEventListener('mousedown', usageOutside);
-      document.addEventListener('keydown', usageEsc);
-    }
-    function closeUsageHelp(){
-      if (!usageHelpOpen) return;
-      elUsageHelp.classList.add('hidden');
-      elUsageHelpBtn.setAttribute('aria-expanded','false');
-      usageHelpOpen = false;
-      document.removeEventListener('mousedown', usageOutside);
-      document.removeEventListener('keydown', usageEsc);
-    }
-    elUsageHelpBtn.addEventListener('click', () => usageHelpOpen ? closeUsageHelp() : openUsageHelp());
-    elUsageHelpClose.addEventListener('click', closeUsageHelp);
-
-  
-    // Cache last response for metrics
-    let last = { labels: [], kwh: [], total_kwh: 0 };
-  
-    async function load(range=currentRange, view=currentView){
-      try{
-        elErr.classList.add('hidden');
-        const data = await fetchUsage(range);
-        last = data;
-  
-        // Decide CI factor
-        let ci = CI_G_PER_KWH_DEFAULT;
-        if (view === 'carbon' && range === 'day') {
-          // For "day", we could call your existing CI proxy to compute a better average.
-          // To keep this fast, we’ll just use the default constant; replace here to aggregate real CI later.
-        }
-  
-        // Chart
-        const unit = (view === 'elec') ? 'kWh' : 'kg CO₂e';
-        const series = (view === 'elec')
-          ? data.kwh
-          : data.kwh.map(v => v * (ci/1000));  // kWh → kg at ci g/kWh
-  
-        renderChart(data.labels, series, unit);
-  
-        // Metrics
-        if (view === 'elec') renderMetricsElec(data.total_kwh);
-        else renderMetricsCarbon(data.total_kwh, ci);
-  
-
-      }catch(err){
-        elErrMsg.textContent = `Unable to load usage (${err.message}).`;
-        elErr.classList.remove('hidden');
-      }
-    }
-  
-    // Controls
-    document.querySelector('.usage-controls').addEventListener('click', (e) => {
-      const btn = e.target.closest('.seg-btn'); if (!btn) return;
-      if (btn.dataset.view){ currentView = btn.dataset.view; setSegActive('.usage-controls', btn); load(); }
-      if (btn.dataset.range){ currentRange = btn.dataset.range; setSegActive('.usage-controls', btn); load(); }
-    });
-    $('#usageRetry').addEventListener('click', () => load());
-  
-    // Initial
-    load();
-  })();
   </script>
 
-<script>
-  (() => {
-    const $  = (s) => document.querySelector(s);
-    const $$ = (s) => Array.from(document.querySelectorAll(s));
-  
-    const TARGET_BUDGET = 0.20;   // target 0.20 kg CO2e / FU to scale the ring (display only)
-  
-    let sciChart;
-    let currentRange = 'day';
-  
-    const ctx  = document.getElementById('sciChart').getContext('2d');
-    const ctr  = document.getElementById('sciCenter');
-    const elOp = document.getElementById('sciOp');
-    const elEm = document.getElementById('sciEmb');
-    const elAss= document.getElementById('sciAssump');
-    const elNote = document.getElementById('sciNote');
-    const elErr  = document.getElementById('sciErr');
-    const elErrMsg = document.getElementById('sciErrMsg');
-  
-    // Simple center text update
-    function setCenter(text){ ctr.textContent = text; }
-  
-    // Create/Update doughnut
-    function renderRing(score, target){
-      const filled = Math.min(score/target, 1);
-      const data = {
-        labels: ['Score', 'Remaining'],
-        datasets: [{ data: [filled, 1-filled], cutout: '70%' }]
-      };
-      const options = {
-        responsive: true, maintainAspectRatio: false, resizeDelay: 150,
-        plugins: { legend: { display: false }, tooltip: { enabled: false } }
-      };
-      if (sciChart) { sciChart.data = data; sciChart.options = options; sciChart.update(); }
-      else { sciChart = new Chart(ctx, { type: 'doughnut', data, options }); }
-    }
-  
-    function renderAssumptions(a){
-      elAss.innerHTML = `
-        <li>CI: ${a.ci_g_per_kwh} g/kWh</li>
-        <li>Lifetime: ${a.lifetime_h.toLocaleString()} h</li>
-        <li>TDP: CPU ${a.tdp_spec.cpu_count}×${a.tdp_spec.cpu_tdp_w}W, GPU ${a.tdp_spec.gpu_count}×${a.tdp_spec.gpu_tdp_w}W</li>
-        <li>Other: RAM ${a.tdp_spec.ram_w}W, Misc ${a.tdp_spec.other_w}W</li>
-      `;
-    }
-  
-    async function fetchSCI(range){
-      const url = `/api/sci-score?range=${encodeURIComponent(range)}`;
-      const res = await fetch(url, { cache: 'no-store' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
-    }
-  
-    async function loadSCI(range = currentRange){
-      try{
-        elErr.classList.add('hidden');
-        const data = await fetchSCI(range);
-  
-        const avg = data.avg_score;
-        setCenter(`${avg.toFixed(2)} kg/FU`);
-        renderRing(avg, TARGET_BUDGET);
-  
-        elOp.textContent = data.operational_kg_per_fu.toFixed(3);
-        elEm.textContent = data.embodied_kg_per_fu.toFixed(3);
-        renderAssumptions(data.assumptions);
-  
-        elNote.textContent = `Average across ${data.labels.length} bins · Target ${TARGET_BUDGET} kg CO₂e/FU`;
-  
-      }catch(err){
-        elErrMsg.textContent = `Unable to load SCI score (${err.message}).`;
-        elErr.classList.remove('hidden');
+  <!-- Usage card script -->
+  <script>
+(() => {
+  const $  = (s) => document.querySelector(s);
+  const $$ = (s) => Array.from(document.querySelectorAll(s));
+
+  const CI_G_PER_KWH_DEFAULT = 220;
+  const CAR_KG_PER_KM        = 0.171;
+  const TREE_KG_PER_YEAR     = 21;
+  const PARIS_DUBAI_KG       = 1000;
+
+  let currentView = 'elec';
+  let currentRange = 'day';
+  let chart;
+
+  const elChart = $('#usageChart').getContext('2d');
+  const elMetrics = $('#metricList');
+  const elTotals  = $('#metricTotals');
+  const elTitle   = $('#metricTitle');
+  const elNote    = $('#usageNote');
+  const elErr     = $('#usageErr');
+  const elErrMsg  = $('#usageErrMsg');
+  const elUsageHelpBtn   = document.getElementById('usageHelpBtn');
+  const elUsageHelp      = document.getElementById('usageHelp');
+  const elUsageHelpClose = document.getElementById('usageHelpClose');
+  let usageHelpOpen = false, usageOutside = null, usageEsc = null;
+
+  function fmt(n, digits=0) { return Number(n).toLocaleString(undefined, { maximumFractionDigits: digits }); }
+  function setSegActive(groupSel, btn){
+    $$(groupSel + ' .seg-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed','false'); });
+    btn.classList.add('active'); btn.setAttribute('aria-pressed','true');
+  }
+
+  async function fetchUsage(range){
+    const url = `/api/project-usage?range=${encodeURIComponent(range)}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  function renderChart(labels, series, unitLabel){
+    const data = { labels, datasets: [{ data: series, borderWidth: 0, backgroundColor: 'rgba(66,133,244,0.7)' }] };
+    const options = {
+      responsive: true, maintainAspectRatio: false, resizeDelay: 150,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${fmt(ctx.parsed.y, 2)} ${unitLabel}` } } },
+      scales: {
+        x: { grid: { display: false } },
+        y: { grid: { color: '#eee' }, ticks: { callback: (v) => v } }
       }
+    };
+    if (chart) { chart.data = data; chart.options = options; chart.update(); }
+    else { chart = new Chart(elChart, { type: 'bar', data, options }); }
+  }
+
+  function renderMetricsElec(totalKWh){
+    elTitle.textContent = 'Electricity equivalency';
+    elMetrics.innerHTML = `
+      <li><strong>${fmt(totalKWh,2)} kWh</strong> total</li>
+      <li>≈ ${fmt(totalKWh / 0.06)} light-bulb hours (60W)</li>
+      <li>≈ ${fmt(totalKWh / 0.065)} laptop hours (65W)</li>
+      <li>≈ ${fmt(totalKWh / 0.11)} kettle boils (0.11 kWh/boil)</li>
+    `;
+    elTotals.innerHTML = `
+      <li>Average per bin: ${fmt(totalKWh / Math.max(1, last.labels.length), 2)} kWh</li>
+    `;
+  }
+
+  function renderMetricsCarbon(totalKWh, gPerKWh){
+    const kg = totalKWh * (gPerKWh / 1000);
+    elTitle.textContent = 'Carbon equivalency';
+    elMetrics.innerHTML = `
+      <li><strong>${fmt(kg,0)} kg CO₂e</strong> (at ${gPerKWh} g/kWh)</li>
+      <li>≈ ${fmt(kg / TREE_KG_PER_YEAR,1)} tree-years</li>
+      <li>≈ ${fmt(kg / CAR_KG_PER_KM,0)} car km</li>
+      <li>≈ ${fmt((kg / PARIS_DUBAI_KG) * 100,1)}% of a Paris→Dubai flight</li>
+    `;
+    elTotals.innerHTML = `
+      <li>Total electricity: ${fmt(last.total_kwh,2)} kWh</li>
+      <li>Average per bin: ${fmt(last.total_kwh / Math.max(1,last.labels.length), 2)} kWh</li>
+    `;
+  }
+
+  function openUsageHelp(){
+    if (usageHelpOpen) return;
+    elUsageHelp.classList.remove('hidden');
+    elUsageHelpBtn.setAttribute('aria-expanded','true');
+    usageHelpOpen = true;
+
+    usageOutside = (e) => { if (!elUsageHelp.contains(e.target) && e.target !== elUsageHelpBtn) closeUsageHelp(); };
+    usageEsc = (e) => { if (e.key === 'Escape') closeUsageHelp(); };
+    document.addEventListener('mousedown', usageOutside);
+    document.addEventListener('keydown', usageEsc);
+  }
+  function closeUsageHelp(){
+    if (!usageHelpOpen) return;
+    elUsageHelp.classList.add('hidden');
+    elUsageHelpBtn.setAttribute('aria-expanded','false');
+    usageHelpOpen = false;
+    document.removeEventListener('mousedown', usageOutside);
+    document.removeEventListener('keydown', usageEsc);
+  }
+  elUsageHelpBtn.addEventListener('click', () => usageHelpOpen ? closeUsageHelp() : openUsageHelp());
+  elUsageHelpClose.addEventListener('click', closeUsageHelp);
+
+  let last = { labels: [], kwh: [], total_kwh: 0 };
+
+  async function load(range=currentRange, view=currentView){
+    try{
+      elErr.classList.add('hidden');
+      const data = await fetchUsage(range);
+      last = data;
+
+      let ci = CI_G_PER_KWH_DEFAULT;
+      if (view === 'carbon' && range === 'day') {
+        // could replace with aggregated CI from your proxy later
+      }
+
+      const unit = (view === 'elec') ? 'kWh' : 'kg CO₂e';
+      const series = (view === 'elec')
+        ? data.kwh
+        : data.kwh.map(v => v * (ci/1000));
+
+      renderChart(data.labels, series, unit);
+
+      if (view === 'elec') renderMetricsElec(data.total_kwh);
+      else renderMetricsCarbon(data.total_kwh, ci);
+
+    }catch(err){
+      elErrMsg.textContent = `Unable to load usage (${err.message}).`;
+      elErr.classList.remove('hidden');
     }
-  
-    // Range controls
-    document.querySelector('.sci-controls').addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-sci-range]'); if (!btn) return;
-      $$('.sci-controls .seg-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed','false'); });
-      btn.classList.add('active'); btn.setAttribute('aria-pressed','true');
-      currentRange = btn.dataset.sciRange;
-      loadSCI();
-    });
-    document.getElementById('sciRetry').addEventListener('click', () => loadSCI());
-  
-    // Help popover
-    const elHelpBtn = document.getElementById('sciHelpBtn');
-    const elHelp    = document.getElementById('sciHelp');
-    const elClose   = document.getElementById('sciHelpClose');
-    let open = false, onDoc=null, onEsc=null;
-  
-    function openHelp(){
-      if (open) return;
-      elHelp.classList.remove('hidden');
-      elHelpBtn.setAttribute('aria-expanded','true');
-      open = true;
-      onDoc = (e)=>{ if (!elHelp.contains(e.target) && e.target !== elHelpBtn) closeHelp(); };
-      onEsc = (e)=>{ if (e.key === 'Escape') closeHelp(); };
-      document.addEventListener('mousedown', onDoc);
-      document.addEventListener('keydown', onEsc);
-    }
-    function closeHelp(){
-      if (!open) return;
-      elHelp.classList.add('hidden');
-      elHelpBtn.setAttribute('aria-expanded','false');
-      open = false;
-      document.removeEventListener('mousedown', onDoc);
-      document.removeEventListener('keydown', onEsc);
-    }
-    elHelpBtn.addEventListener('click', ()=> open ? closeHelp() : openHelp());
-    elClose.addEventListener('click', closeHelp);
-  
-    // Initial
-    loadSCI();
-  })();
+  }
+
+  document.querySelector('.usage-controls').addEventListener('click', (e) => {
+    const btn = e.target.closest('.seg-btn'); if (!btn) return;
+    if (btn.dataset.view){ currentView = btn.dataset.view; setSegActive('.usage-controls', btn); load(); }
+    if (btn.dataset.range){ currentRange = btn.dataset.range; setSegActive('.usage-controls', btn); load(); }
+  });
+  $('#usageRetry').addEventListener('click', () => load());
+
+  load();
+})();
   </script>
-  
 
 </body>
 </html>
