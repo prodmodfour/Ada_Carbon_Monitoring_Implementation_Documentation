@@ -83,7 +83,25 @@
           <button id="ciApply" class="pill">Apply</button>
         </div>
       </div>
+      <button id="ciHelpBtn" class="ci-help-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="ciHelp" title="What is this?">?</button>
     </div>
+
+    <div class="ci-popover hidden" id="ciHelp" role="dialog" aria-modal="true" aria-label="About Carbon Intensity Forecast (GB)">
+      <button class="ci-popover-close" id="ciHelpClose" aria-label="Close">×</button>
+      <h4>What am I seeing?</h4>
+      <ul class="ci-popover-list">
+        <li><strong>Data:</strong> half-hourly <em>forecast</em> of GB grid carbon intensity (gCO₂/kWh).</li>
+        <li><strong>Times:</strong> shown in your local time; the API provides UTC which we convert.</li>
+        <li><strong>Ranges:</strong> Working day (08:00–17:00), next 24h, next 48h, or a custom range
+          (capped at 48h since longer forecasts are less accurate).</li>
+        <li><strong>Best 3-hour window:</strong> the light green band marks the lowest contiguous 3 hours
+          (6 half-hour points) by average gCO₂/kWh.</li>
+        <li><strong>Now marker:</strong> a dashed line appears if “now” falls in the selected range.</li>
+        <li><strong>Working day rule:</strong> before 08:00 → today; after 17:00 → tomorrow (weekends included).</li>
+      </ul>
+      <p class="ci-popover-foot">Source: GB Carbon Intensity API.</p>
+    </div>
+    
 
     <div class="ci-chart">
       <canvas id="ciForecastChart"></canvas>
@@ -225,6 +243,13 @@
   const elCustomWrap = $('#ciCustom');
   const elFrom = $('#ciFrom');
   const elTo = $('#ciTo');
+  const elHelpBtn   = document.getElementById('ciHelpBtn');
+  const elHelp      = document.getElementById('ciHelp');
+  const elHelpClose = document.getElementById('ciHelpClose');
+  let helpOpen = false;
+  let helpOutsideListener = null;
+  let helpEscListener = null;
+
 
   // ===== Chart state =====
   let chart;
@@ -456,6 +481,41 @@
     if (r === '48h')     return select48h();
     if (r === 'custom')  return $('#ciApply').click();
   });
+
+  function openHelp(){
+  if (helpOpen) return;
+  elHelp.classList.remove('hidden');
+  elHelpBtn.setAttribute('aria-expanded', 'true');
+  helpOpen = true;
+
+  // close on outside click
+  helpOutsideListener = (e) => {
+    if (!elHelp.contains(e.target) && e.target !== elHelpBtn){
+      closeHelp();
+    }
+  };
+  document.addEventListener('mousedown', helpOutsideListener);
+
+  // close on Esc
+  helpEscListener = (e) => {
+    if (e.key === 'Escape') closeHelp();
+  };
+  document.addEventListener('keydown', helpEscListener);
+}
+
+function closeHelp(){
+  if (!helpOpen) return;
+  elHelp.classList.add('hidden');
+  elHelpBtn.setAttribute('aria-expanded', 'false');
+  helpOpen = false;
+  document.removeEventListener('mousedown', helpOutsideListener);
+  document.removeEventListener('keydown', helpEscListener);
+}
+
+elHelpBtn.addEventListener('click', () => {
+  helpOpen ? closeHelp() : openHelp();
+});
+elHelpClose.addEventListener('click', closeHelp);
 
   // Initial load
   selectWorkingDay();
