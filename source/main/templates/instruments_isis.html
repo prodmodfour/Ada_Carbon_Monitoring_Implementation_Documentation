@@ -39,10 +39,16 @@
         </div>
         <div class="instrument-grid">
           {% for inst in instruments %}
-          <a class="instrument-btn" href="{% url 'instrument_detail' source inst %}">{{ inst }}</a>
+          <a class="instrument-btn" href="{% url 'instrument_detail' source inst.name %}">
+            <span class="inst-name">{{ inst.name }}</span>
+            <span class="inst-figures">
+              {{ inst.kwh_per_hour|floatformat:2 }} kWh/h ·
+              {{ inst.kg_per_hour|floatformat:2 }} kg&nbsp;CO₂e/h
+            </span>
+          </a>
           {% endfor %}
-        
         </div>
+        
       </div>
     </main>
   </div>

@@ -57,26 +57,48 @@ def analysis(request, source: str):
     }
     return render(request, "analysis.html", context)
 
+DEFAULT_CI_G_PER_KWH = 220
+def _instrument_hourly_figures(inst_name: str, ci_gpkwh: float = DEFAULT_CI_G_PER_KWH):
+    """
+    Dummy average electricity/carbon usage per hour for an instrument.
+    Uses your deterministic hardware spec + a simple average utilization.
+    """
+    # Start from your default TDP spec, then swap CPU/GPU counts per instrument
+    spec = DEFAULT_TDP_SPEC.copy()
+    hw = _stable_specs_for(inst_name)
+    spec["cpu_count"] = int(hw.get("cpus", spec["cpu_count"]))
+    spec["gpu_count"] = int(hw.get("gpus", spec["gpu_count"]))
 
+    # Full-watt calculation matches your other helpers
+    full_watts = (
+        spec["cpu_count"] * spec["cpu_tdp_w"] +
+        spec["gpu_count"] * spec["gpu_tdp_w"] +
+        spec["ram_w"] + spec["other_w"]
+    )
 
+    avg_util = 0.60  # simple average utilization (dummy)
+    kwh_per_hour = (full_watts * avg_util) / 1000.0
+    kg_per_hour  = kwh_per_hour * (ci_gpkwh / 1000.0)
+    return round(kwh_per_hour, 2), round(kg_per_hour, 2)
 
 def instruments(request: HttpRequest, source: str) -> HttpResponse:
-
     source_key = source.lower()
-    # Define instruments for each facility. These lists are derived from
-    # the screenshots provided by the user and may be updated as needed.
+
     isis_instruments = [
-        # ISIS instrument names extracted from the provided screenshot
-        'ALF', 'ARGUS', 'CHRONUS', 'CRISP', 'EMU', 'ENGINX', 'GEM', 'HIFI', 'HRPD', 'IMAT',
-        'INES', 'INTER', 'IRIS', 'LARMOR', 'LET', 'LOQ', 'MAPS', 'MARI', 'MERLIN', 'MUSR',
-        'NEUTRONICS', 'NIMROD', 'NMIDG', 'OFFSPEC', 'OSIRIS', 'PEARL', 'POLARIS', 'POLREF',
-        'SANDALS', 'SANS2D', 'SURF', 'SXD', 'TOSCA', 'VESUVIO', 'WISH', 'ZOOM'
+        'ALF','ARGUS','CHRONUS','CRISP','EMU','ENGINX','GEM','HIFI','HRPD','IMAT','INES','INTER',
+        'IRIS','LARMOR','LET','LOQ','MAPS','MARI','MERLIN','MUSR','NEUTRONICS','NIMROD','NMIDG',
+        'OFFSPEC','OSIRIS','PEARL','POLARIS','POLREF','SANDALS','SANS2D','SURF','SXD','TOSCA',
+        'VESUVIO','WISH','ZOOM'
     ]
     clf_instruments = ['ARTEMIS', 'EPAC', 'GEMINI', 'OCTOPUS', 'ULTRA', 'VULCAN']
-    if source_key == 'isis':
-        instruments = isis_instruments
-    else:
-        instruments = clf_instruments
+
+    base_list = isis_instruments if source_key == 'isis' else clf_instruments
+    # Enrich each instrument with two tiny per-hour figures (dummy)
+    instruments = []
+    for name in base_list:
+        kwh_h, kg_h = _instrument_hourly_figures(name)
+        instruments.append({"name": name, "kwh_per_hour": kwh_h, "kg_per_hour": kg_h})
+
     context = {
         'source_title': {
             'isis': 'ISIS Data Analysis',
@@ -86,9 +108,9 @@ def instruments(request: HttpRequest, source: str) -> HttpResponse:
         'instruments': instruments,
         'source': source,
     }
-    # Choose template based on facility; reuse same layout but lists differ.
     template_name = 'instruments_isis.html' if source_key == 'isis' else 'instruments_clf.html'
     return render(request, template_name, context)
+
 
 def _stable_specs_for(instrument_name: str) -> dict:
 

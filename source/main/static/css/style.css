@@ -775,3 +775,12 @@ html, body {
   70% { box-shadow: 0 0 0 10px rgba(22,163,74,0); }
   100% { box-shadow: 0 0 0 0 rgba(22,163,74,0); }
 }
+
+.instrument-btn .inst-name { display: block; }
+.instrument-btn .inst-figures {
+  display: block;
+  font-size: 0.85rem;
+  opacity: 0.85;
+  margin-top: 4px;
+  white-space: nowrap;
+}
