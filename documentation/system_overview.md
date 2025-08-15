@@ -47,6 +47,8 @@
     * Estimated electricity usage of the service over x time period (Selectable data range or day, month, year). This uses TDP calculations.
         * Carbon footprint view
         * Carbon equivalency metrics
+* Instrument figure
+    * Estimated average electricuty/ carbon usage of the instrument per hour
 
 
 ## Real time configuration changes

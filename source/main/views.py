@@ -335,3 +335,129 @@ def project_usage_api(request):
         "spec": spec,
         # Note: client will convert to CO2e using CI factors (can also be server-side later)
     })
+
+# ---- SCI Score dummy API ----------------------------------------------------
+# If DEFAULT_TDP_SPEC already exists (from project usage API), we reuse it.
+try:
+    DEFAULT_TDP_SPEC
+except NameError:
+    DEFAULT_TDP_SPEC = {
+        "cpu_count": 12,
+        "cpu_tdp_w": 12,
+        "gpu_count": 1,
+        "gpu_tdp_w": 250,
+        "ram_w": 20,
+        "other_w": 30
+    }
+
+# Embodied carbon placeholders (kg CO2e) — swap to DB later
+DEFAULT_EMBODIED = {
+    "cpu_kg": 30,     # per CPU package
+    "gpu_kg": 320,    # per accelerator
+    "system_kg": 100  # motherboard/chassis/psu share
+}
+DEFAULT_CI_G_PER_KWH = 220         # location-based intensity (g/kWh)
+DEFAULT_LIFETIME_HOURS = 3*365*8   # 3 years @ 8h/day (simplified)
+
+def _sci_seeded(seed="sci"):
+    return random.Random(seed)
+
+def _power_full_watts(spec):
+    return (
+        spec["cpu_count"] * spec["cpu_tdp_w"] +
+        spec["gpu_count"] * spec["gpu_tdp_w"] +
+        spec["ram_w"] + spec["other_w"]
+    )
+
+def _sci_base_per_compute_hour(spec, embodied=DEFAULT_EMBODIED, ci_gpkwh=DEFAULT_CI_G_PER_KWH, lifetime_h=DEFAULT_LIFETIME_HOURS):
+    """Return (operational_kg_per_FU, embodied_kg_per_FU, score_kg_per_FU) for FU='compute-hour'."""
+    watts = _power_full_watts(spec)
+    kwh_per_hour = watts / 1000.0      # for 1 compute-hour at 100% util (mock)
+    operational_kg = kwh_per_hour * (ci_gpkwh / 1000.0)
+    embodied_total_kg = embodied["cpu_kg"] + embodied["gpu_kg"]*spec["gpu_count"] + embodied["system_kg"]
+    embodied_kg = embodied_total_kg / max(1, lifetime_h)
+    return operational_kg, embodied_kg, operational_kg + embodied_kg
+
+def _sci_series(range_key, spec, ci_gpkwh=DEFAULT_CI_G_PER_KWH):
+    """
+    Build deterministic 'trend' per range (labels + score per FU) around the base value.
+    Day: 24 points (hours); Month: 30 points (days); Year: 12 points (months).
+    """
+    rng = _sci_seeded(f"sci-{range_key}")
+    op, emb, base = _sci_base_per_compute_hour(spec, DEFAULT_EMBODIED, ci_gpkwh, DEFAULT_LIFETIME_HOURS)
+
+    if range_key == "day":
+        labels = [f"{str(h).zfill(2)}:00" for h in range(24)]
+        vals = [max(0.01, base * (1 + rng.uniform(-0.15, 0.15))) for _ in labels]
+    elif range_key == "month":
+        labels = [f"D{d}" for d in range(1, 31)]
+        vals = [max(0.01, base * (1 + rng.uniform(-0.12, 0.12))) for _ in labels]
+    elif range_key == "year":
+        labels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+        vals = [max(0.01, base * (1 + rng.uniform(-0.10, 0.10))) for _ in labels]
+    else:
+        return [], [], 0, 0, 0
+
+    avg = sum(vals) / len(vals) if vals else 0.0
+    return labels, vals, avg, op, emb
+
+def sci_score_api(request):
+    """
+    Returns an SCI score for a chosen range.
+    Query params:
+      - range: day | month | year
+      - ci: override carbon intensity (g/kWh)
+      - (optional) tdp_* and embodied_* and lifetime_h to override assumptions
+    """
+    range_key = (request.GET.get("range") or "day").lower()
+    if range_key not in ("day","month","year"):
+        return HttpResponseBadRequest("range must be day|month|year")
+
+    # TDP spec overrides
+    spec = DEFAULT_TDP_SPEC.copy()
+    for key in ("cpu_count","gpu_count"):
+        if key in request.GET:
+            try: spec[key] = int(request.GET[key])
+            except: pass
+    for key in ("cpu_tdp_w","gpu_tdp_w","ram_w","other_w"):
+        if key in request.GET:
+            try: spec[key] = float(request.GET[key])
+            except: pass
+
+    # Embodied & lifetime overrides
+    embodied = DEFAULT_EMBODIED.copy()
+    for key in ("cpu_kg","gpu_kg","system_kg"):
+        if key in request.GET:
+            try: embodied[key] = float(request.GET[key])
+            except: pass
+    lifetime_h = DEFAULT_LIFETIME_HOURS
+    if "lifetime_h" in request.GET:
+        try: lifetime_h = max(1, int(request.GET["lifetime_h"]))
+        except: pass
+
+    # Carbon intensity override
+    ci = DEFAULT_CI_G_PER_KWH
+    if "ci" in request.GET:
+        try: ci = float(request.GET["ci"])
+        except: pass
+
+    # Compute series and averages
+    labels, vals, avg, op_kg, emb_kg = _sci_series(range_key, spec, ci)
+    # Recompute embodied per FU with possibly new lifetime
+    op_kg_fixed, emb_kg_fixed, avg_base = _sci_base_per_compute_hour(spec, embodied, ci, lifetime_h)
+
+    return JsonResponse({
+        "range": range_key,
+        "fu": "compute-hour",
+        "labels": labels,
+        "trend": [round(v, 4) for v in vals],     # kg CO2e / FU
+        "avg_score": round(avg, 4),               # kg CO2e / FU (from trend)
+        "operational_kg_per_fu": round(op_kg_fixed, 4),
+        "embodied_kg_per_fu": round(emb_kg_fixed, 4),
+        "assumptions": {
+            "tdp_spec": spec,
+            "embodied": embodied,
+            "lifetime_h": lifetime_h,
+            "ci_g_per_kwh": ci
+        }
+    })

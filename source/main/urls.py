@@ -26,5 +26,7 @@ urlpatterns = [
     path('analysis/<str:source>/workspaces/<str:ws_id>/', views.workspace_detail, name='workspace_detail'),
     path('api/ci', views.ci_proxy, name='ci_proxy'),
     path('api/project-usage', views.project_usage_api, name='project_usage_api'),
+    path('api/sci-score', views.sci_score_api, name='sci_score_api'),
+
 
 ]
