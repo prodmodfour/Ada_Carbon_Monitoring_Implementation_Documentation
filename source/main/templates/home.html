@@ -32,18 +32,17 @@
   </section>
 
   <!-- SCI Score (Home) -->
-  <section class="sci-card" data-sci-url="{% url 'sci_score_api' %}">
+  <section class="sci-card clean" data-sci-url="{% url 'sci_score_api' %}">
     <div class="sci-head">
       <div>
         <div class="sci-title">SCI Score</div>
         <div class="sci-caption">lower is better</div>
       </div>
-      <button id="sciHelpBtn" class="sci-help-btn"
-              aria-haspopup="dialog" aria-expanded="false"
-              aria-controls="sciHelp" title="What is SCI?">?</button>
+      <button id="sciHelpBtn" class="sci-help-btn" aria-haspopup="dialog"
+              aria-expanded="false" aria-controls="sciHelp" title="What is SCI?">?</button>
     </div>
   
-    <!-- Help popover (kept) -->
+    <!-- Help popover (unchanged) -->
     <div class="sci-popover hidden" id="sciHelp" role="dialog" aria-modal="true" aria-label="About SCI Score">
       <button class="sci-popover-close" id="sciHelpClose" aria-label="Close">×</button>
       <h4>What is SCI?</h4>
@@ -56,9 +55,12 @@
     </div>
   
     <div class="sci-body solo">
-      <div id="sciValue" class="sci-value">—</div>
+      <div class="sci-value-wrap">
+        <div id="sciValue" class="sci-value">—</div>
+      </div>
     </div>
   </section>
+  
   
   
 
@@ -112,22 +114,30 @@
     </div>
   </div>
 
-  <!-- Chart.js + SCI script -->
+  <!-- SCI script -->
   <script>
     (() => {
-      const sciCard   = document.querySelector('.sci-card');
-      const sciApi    = sciCard.dataset.sciUrl;
-      const elValue   = document.getElementById('sciValue');
+      const sciCard = document.querySelector('.sci-card.clean');
+      const sciApi  = sciCard.dataset.sciUrl;
+      const elValue = document.getElementById('sciValue');
     
-      async function loadSCI() {
-        try {
-          // default to 'day' behind the scenes; UI stays minimal
+      function setNumber(x){
+        // trigger tiny pop-in animation on update
+        elValue.classList.remove('popin');
+        // force reflow to restart animation
+        void elValue.offsetWidth;
+        elValue.textContent = Number(x).toFixed(2);
+        elValue.classList.add('popin');
+      }
+    
+      async function loadSCI(){
+        try{
           const res = await fetch(`${sciApi}?range=day`, { cache: 'no-store' });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          if(!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
-          elValue.textContent = Number(data.avg_score).toFixed(2);  // no unit
-        } catch (e) {
-          console.error('SCI fetch failed:', e);
+          setNumber(data.avg_score);
+        }catch(err){
+          console.error('SCI fetch failed:', err);
           elValue.textContent = '—';
         }
       }
@@ -136,9 +146,9 @@
       const btn = document.getElementById('sciHelpBtn');
       const pop = document.getElementById('sciHelp');
       const x   = document.getElementById('sciHelpClose');
-      let open = false, onDoc=null, onEsc=null;
+      let open=false, onDoc=null, onEsc=null;
       function openHelp(){ if(open) return; pop.classList.remove('hidden'); btn.setAttribute('aria-expanded','true'); open=true;
-        onDoc=(e)=>{ if(!pop.contains(e.target) && e.target!==btn) closeHelp(); };
+        onDoc=(e)=>{ if(!pop.contains(e.target)&&e.target!==btn) closeHelp(); };
         onEsc=(e)=>{ if(e.key==='Escape') closeHelp(); };
         document.addEventListener('mousedown', onDoc); document.addEventListener('keydown', onEsc);
       }
