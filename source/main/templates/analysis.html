@@ -131,8 +131,40 @@
         <button class="seg-btn" data-range="month" aria-pressed="false">Month</button>
         <button class="seg-btn" data-range="year" aria-pressed="false">Year</button>
       </div>
+      <button id="usageHelpBtn" class="usage-help-btn"
+        aria-haspopup="dialog" aria-expanded="false"
+        aria-controls="usageHelp" title="What is this?">?</button>
     </div>
   </div>
+  <div class="usage-popover hidden" id="usageHelp" role="dialog"
+  aria-modal="true" aria-label="About Estimated Electricity Usage (Project)">
+<button class="usage-popover-close" id="usageHelpClose" aria-label="Close">×</button>
+
+<h4>How we estimate electricity (TDP-based)</h4>
+<ol class="usage-popover-list">
+ <li><strong>Component power (Watts)</strong> = CPUs × CPU&nbsp;TDP + GPUs × GPU&nbsp;TDP + RAM&nbsp;W + Other&nbsp;W.</li>
+ <li><strong>Utilization profile</strong> scales those Watts per time bin (hour/day/month).</li>
+ <li><strong>Energy (kWh)</strong> = Watts ÷ 1000 × duration (hours), summed across bins.</li>
+ <li><strong>Carbon (kg&nbsp;CO₂e)</strong> = Energy × grid carbon intensity (g&nbsp;CO₂/kWh ÷ 1000), using location-based factors.</li>
+</ol>
+
+<h4>Why use TDP?</h4>
+<p>When direct metering isn’t available, many tools estimate power from manufacturer TDPs combined with utilization (often using conservative scaling). See:</p>
+<ul class="usage-sources">
+ <li><a href="https://mlco2.github.io/codecarbon/methodology.html" target="_blank" rel="noopener">
+   CodeCarbon methodology (TDP lookup & fallback)</a></li>
+ <li><a href="https://github.com/Green-Software-Foundation/sci-data-guidance/blob/dev/use-case-submissions/msft-eShoppen.md" target="_blank" rel="noopener">
+   Green Software Foundation SCI data guidance (TDP for components)</a></li>
+ <li><a href="https://www.etsy.com/codeascraft/cloud-jewels-estimating-kwh-in-the-cloud" target="_blank" rel="noopener">
+   Etsy Cloud Jewels (kWh estimation in the cloud)</a></li>
+ <li><a href="https://www.cloudcarbonfootprint.org/docs/methodology/" target="_blank" rel="noopener">
+   Cloud Carbon Footprint (estimation methodology)</a></li>
+ <li><a href="https://carbon-intensity.github.io/api-definitions/" target="_blank" rel="noopener">
+   GB Carbon Intensity API (g&nbsp;CO₂/kWh, forecasts)</a></li>
+ <li><a href="https://boavizta.org/en/blog/calculettes-carbone-clouds-providers" target="_blank" rel="noopener">
+   Boavizta — prefer location-based factors</a></li>
+</ul>
+</div>
 
   <div class="usage-body">
     <div class="usage-chart">
@@ -591,6 +623,11 @@ elHelpClose.addEventListener('click', closeHelp);
     const elNote    = $('#usageNote');
     const elErr     = $('#usageErr');
     const elErrMsg  = $('#usageErrMsg');
+    const elUsageHelpBtn   = document.getElementById('usageHelpBtn');
+    const elUsageHelp      = document.getElementById('usageHelp');
+    const elUsageHelpClose = document.getElementById('usageHelpClose');
+    let usageHelpOpen = false, usageOutside = null, usageEsc = null;
+
   
     // helpers
     function fmt(n, digits=0) { return Number(n).toLocaleString(undefined, { maximumFractionDigits: digits }); }
@@ -647,6 +684,29 @@ elHelpClose.addEventListener('click', closeHelp);
         <li>Average per bin: ${fmt(last.total_kwh / Math.max(1,last.labels.length), 2)} kWh</li>
       `;
     }
+
+    function openUsageHelp(){
+      if (usageHelpOpen) return;
+      elUsageHelp.classList.remove('hidden');
+      elUsageHelpBtn.setAttribute('aria-expanded','true');
+      usageHelpOpen = true;
+
+      usageOutside = (e) => { if (!elUsageHelp.contains(e.target) && e.target !== elUsageHelpBtn) closeUsageHelp(); };
+      usageEsc = (e) => { if (e.key === 'Escape') closeUsageHelp(); };
+      document.addEventListener('mousedown', usageOutside);
+      document.addEventListener('keydown', usageEsc);
+    }
+    function closeUsageHelp(){
+      if (!usageHelpOpen) return;
+      elUsageHelp.classList.add('hidden');
+      elUsageHelpBtn.setAttribute('aria-expanded','false');
+      usageHelpOpen = false;
+      document.removeEventListener('mousedown', usageOutside);
+      document.removeEventListener('keydown', usageEsc);
+    }
+    elUsageHelpBtn.addEventListener('click', () => usageHelpOpen ? closeUsageHelp() : openUsageHelp());
+    elUsageHelpClose.addEventListener('click', closeUsageHelp);
+
   
     // Cache last response for metrics
     let last = { labels: [], kwh: [], total_kwh: 0 };
