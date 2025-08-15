@@ -40,6 +40,12 @@ def home(request: HttpRequest) -> HttpResponse:
 
 def analysis(request, source: str):
     source_key = source.lower()
+    items = _ensure_workspace_ids(request, source)
+    enriched = []
+    for ws in items:
+        m = _estimate_ws_metrics(ws)  
+        enriched.append({**ws, **m})
+
     context = {
         "source_title": {
             "isis": "ISIS Data Analysis",
@@ -47,7 +53,7 @@ def analysis(request, source: str):
             "diamond": "Diamond Data Analysis",
         }.get(source_key, f"{source.title()} Data Analysis"),
         "source": source,
-        "workspaces": _ensure_workspace_ids(request, source),  # ensure every item has an id
+        "workspaces": enriched,
     }
     return render(request, "analysis.html", context)
 
@@ -479,3 +485,55 @@ def ghg_score_api(request):
     today = timezone.now().timetuple().tm_yday
     value = round(base + (today % 5) * 1.7, 2)
     return JsonResponse({"value": value})
+
+# Build a per-workspace TDP spec by combining your deterministic instrument specs
+# with the default per-part wattages you already use elsewhere.
+def _tdp_spec_for_ws(ws: dict) -> dict:
+    base = DEFAULT_TDP_SPEC.copy()
+    try:
+        inst = ws.get("instrument") or ""
+        inst_specs = _stable_specs_for(inst)  # cpus/gpus from your helper
+        base["cpu_count"] = int(inst_specs.get("cpus", base["cpu_count"]))
+        base["gpu_count"] = int(inst_specs.get("gpus", base["gpu_count"]))
+    except Exception:
+        pass
+    return base
+
+def _estimate_ws_metrics(ws: dict, ci_gpkwh: float = 220.0) -> dict:
+    """
+    Dummy, deterministic-ish figures per workspace using your TDP method:
+      - total_kwh: sum over a simple day profile (24 hourly bins)
+      - idle_kwh: assume ~12h/day at low idle watts
+      - *_kg: convert with location-based CI (g/kWh -> kg)
+      - idle_w: live counter power draw (W) for the idle ticker on the card
+    """
+    spec = _tdp_spec_for_ws(ws)
+
+    # Reuse your power calc pieces
+    full_watts = (
+        spec["cpu_count"] * spec["cpu_tdp_w"] +
+        spec["gpu_count"] * spec["gpu_tdp_w"] +
+        spec["ram_w"] + spec["other_w"]
+    )
+
+    # Day profile from your project API logic
+    labels, kwh_series = _make_series("day", spec)
+    total_kwh = round(sum(kwh_series), 2)
+
+    # Idle watts = platform + ~10% of silicon as a conservative floor
+    idle_w = round(
+        spec["ram_w"] + spec["other_w"] +
+        0.10 * (spec["cpu_count"] * spec["cpu_tdp_w"] + spec["gpu_count"] * spec["gpu_tdp_w"]),
+        1
+    )
+    idle_kwh = round((idle_w / 1000.0) * 12.0, 2)  # ~12h/day idling
+
+    total_kg = round(total_kwh * (ci_gpkwh / 1000.0), 2)
+    idle_kg  = round(idle_kwh  * (ci_gpkwh / 1000.0), 2)
+
+    return {
+        "tdp_spec": spec,
+        "total_kwh": total_kwh, "idle_kwh": idle_kwh,
+        "total_kg": total_kg,   "idle_kg": idle_kg,
+        "idle_w": idle_w, "ci": ci_gpkwh
+    }

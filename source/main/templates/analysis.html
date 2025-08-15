@@ -215,6 +215,44 @@
                 </div>
               </div>
 
+              <!-- Workspace Figures (Electricity & Carbon) -->
+<div class="ws-figures"
+data-total-kwh="{{ ws.total_kwh|default:0 }}"
+data-idle-kwh="{{ ws.idle_kwh|default:0 }}"
+data-total-kg="{{ ws.total_kg|default:0 }}"
+data-idle-kg="{{ ws.idle_kg|default:0 }}"
+data-idle-w="{{ ws.idle_w|default:0 }}"
+data-ci="{{ ws.ci|default:220 }}">
+
+<div class="figure-row">
+<div class="figure-label">Electricity (kWh)</div>
+<div class="figure-bar" data-kind="kwh" role="img"
+    aria-label="Idle {{ ws.idle_kwh|default:0 }} of {{ ws.total_kwh|default:0 }} kWh"></div>
+<div class="figure-legend">
+ <span>Total: {{ ws.total_kwh|default:0 }}</span>
+ <span>Idle: {{ ws.idle_kwh|default:0 }}</span>
+</div>
+</div>
+
+<div class="figure-row">
+<div class="figure-label">Carbon (kg&nbsp;CO₂e)</div>
+<div class="figure-bar" data-kind="kg" role="img"
+    aria-label="Idle {{ ws.idle_kg|default:0 }} of {{ ws.total_kg|default:0 }} kg CO₂e"></div>
+<div class="figure-legend">
+ <span>Total: {{ ws.total_kg|default:0 }}</span>
+ <span>Idle: {{ ws.idle_kg|default:0 }}</span>
+</div>
+</div>
+
+<div class="idle-live">
+<span class="idle-dot" aria-hidden="true"></span>
+<strong>Idle use counter:</strong>
+<span class="idle-kwh-counter">0.000</span> kWh ·
+<span class="idle-kg-counter">0.0000</span> kg CO₂e
+</div>
+</div>
+
+
               <div class="workspace-actions">
                 <button class="start-btn" disabled>START JUPYTER</button>
               </div>
@@ -686,6 +724,47 @@
   load();
 })();
   </script>
+
+<script>
+  (() => {
+    const $$ = (s) => Array.from(document.querySelectorAll(s));
+    const fmt = (n, d=2) => Number(n).toLocaleString(undefined, { minimumFractionDigits:d, maximumFractionDigits:d });
+  
+    $$('.ws-figures').forEach((el) => {
+      const totalK = parseFloat(el.dataset.totalKwh || '0');
+      const idleK  = parseFloat(el.dataset.idleKwh  || '0');
+      const totalG = parseFloat(el.dataset.totalKg  || '0');
+      const idleG  = parseFloat(el.dataset.idleKg   || '0');
+      const idleW  = parseFloat(el.dataset.idleW    || '0');
+      const ci     = parseFloat(el.dataset.ci       || '220');
+  
+      const kBar = el.querySelector('.figure-bar[data-kind="kwh"]');
+      const gBar = el.querySelector('.figure-bar[data-kind="kg"]');
+      const kPct = totalK > 0 ? (idleK / totalK) * 100 : 0;
+      const gPct = totalG > 0 ? (idleG / totalG) * 100 : 0;
+      if (kBar) kBar.style.setProperty('--pct', kPct + '%');
+      if (gBar) gBar.style.setProperty('--pct', gPct + '%');
+  
+      const elK = el.querySelector('.idle-kwh-counter');
+      const elG = el.querySelector('.idle-kg-counter');
+  
+      // Live idle counters (increment each second using idleW)
+      const incrKwh = (idleW / 1000) / 3600;   // kWh per second
+      const incrKg  = incrKwh * (ci / 1000);   // kg CO2e per second
+  
+      let kwh = 0, kg = 0;
+      function tick() {
+        kwh += incrKwh;
+        kg  += incrKg;
+        if (elK) elK.textContent = fmt(kwh, 3);
+        if (elG) elG.textContent = fmt(kg, 4);
+      }
+      tick();
+      setInterval(tick, 1000);
+    });
+  })();
+  </script>
+  
 
 </body>
 </html>

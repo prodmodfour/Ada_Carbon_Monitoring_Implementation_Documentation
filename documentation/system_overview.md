@@ -41,7 +41,9 @@
 * SCI Score
 * GHG Score
 * Workspace figures
-    * Idle Usage Counter per workspace
+      * Total use per workspace    
+      * Idle Use Counter per workspace
+Figures in electricity and carbon. Estimated using tdp method
 
 
 * Instrument figure
