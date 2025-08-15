@@ -85,7 +85,9 @@
       </div>
     </div>
 
-    <canvas id="ciForecastChart" height="300"></canvas>
+    <div class="ci-chart">
+      <canvas id="ciForecastChart"></canvas>
+    </div>
 
     <div class="ci-note" id="ciNote" role="note"></div>
     <div class="ci-error hidden" id="ciError" role="alert">
@@ -284,6 +286,7 @@
     const options = {
       responsive: true,
       maintainAspectRatio: false,
+      resizeDelay: 150,  // <— add this line
       plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
       scales: {
         x: { type: 'category', grid: { display: false } },

@@ -555,3 +555,20 @@ html, body {
 
 /* Optional: make the forecast card centered like others if your content is wider */
 .content .ci-card { margin-left: 0; }
+
+
+/* Carbon Intensity chart sizing */
+.ci-chart{
+  position: relative;
+  width: 100%;
+  height: 280px;           /* <-- locks the height so it can't keep stretching */
+}
+@media (min-width: 1200px){
+  .ci-chart{ height: 320px; }
+}
+/* Make the canvas fill its wrapper exactly */
+.ci-card canvas{
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
