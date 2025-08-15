@@ -461,3 +461,21 @@ def sci_score_api(request):
             "ci_g_per_kwh": ci
         }
     })
+
+
+def ghg_score_api(request):
+    """
+    Minimal mock GHG 'headline' value.
+    Replace with your real aggregation later (e.g., scope 1/2/3 totals over a period).
+    """
+    rng = request.GET.get('range', 'day')
+    # simple deterministic dummy so it 'looks alive'
+    base = 120.0  # pretend daily headline value
+    if rng == 'month':
+        base = 3600.0
+    elif rng == 'year':
+        base = 43000.0
+
+    today = timezone.now().timetuple().tm_yday
+    value = round(base + (today % 5) * 1.7, 2)
+    return JsonResponse({"value": value})

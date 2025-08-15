@@ -42,7 +42,7 @@
 * GHG Score
 * Workspace figures
     * Idle Usage Counter per workspace
-    * Best time in work hours (8 am to 5 PM) to use in terms of carbon intensity
+
 
 * Instrument figure
     * Estimated average electricuty/ carbon usage of the instrument per hour
