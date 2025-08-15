@@ -726,3 +726,20 @@ html, body {
 .metric-list li{margin:4px 0}
 
 .sci-note{margin-top:8px;font-size:12px;color:#607d8b}
+/* Tighter SCI layout */
+.sci-body.slim{display:grid;grid-template-columns:320px 1fr;gap:16px;margin-top:12px}
+@media (max-width: 900px){ .sci-body.slim{grid-template-columns:1fr} }
+
+.sci-chart{position:relative;width:100%;height:240px}
+.sci-chart canvas{width:100% !important;height:100% !important;display:block}
+.sci-center.big{font-size:22px}
+
+/* Status badge */
+.status-badge{display:inline-block;margin-left:8px;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:600}
+.status-badge.good{background:#e8f5e9;color:#1b5e20}
+.status-badge.warn{background:#fff8e1;color:#8d6e00}
+.status-badge.bad{background:#ffebee;color:#b71c1c}
+
+/* Utility */
+.muted{color:#78909c;margin-left:6px}
+
