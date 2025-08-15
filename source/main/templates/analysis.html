@@ -676,10 +676,7 @@ elHelpClose.addEventListener('click', closeHelp);
         if (view === 'elec') renderMetricsElec(data.total_kwh);
         else renderMetricsCarbon(data.total_kwh, ci);
   
-        // Note (server assumptions)
-        const s = data.spec;
-        $('#usageNote').textContent =
-          `Assumptions: CPUs=${s.cpu_count}×${s.cpu_tdp_w}W, GPUs=${s.gpu_count}×${s.gpu_tdp_w}W, RAM≈${s.ram_w}W, Other≈${s.other_w}W.`;
+
       }catch(err){
         elErrMsg.textContent = `Unable to load usage (${err.message}).`;
         elErr.classList.remove('hidden');
