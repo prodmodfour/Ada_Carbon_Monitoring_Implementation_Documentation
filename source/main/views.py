@@ -1,4 +1,4 @@
-import random
+import random, math, datetime as dt
 
 import uuid
 import urllib.request, json
@@ -229,3 +229,109 @@ def ci_proxy(request):
             return JsonResponse(payload)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=502)
+
+# ---- Project usage dummy API (swap to DB later) -----------------------------
+
+# Default TDP spec (Watts). Replace with DB values later.
+DEFAULT_TDP_SPEC = {
+    "cpu_count": 12,    # logical or physical; up to you
+    "cpu_tdp_w": 12,    # per-core watts under typical load (not peak)
+    "gpu_count": 1,
+    "gpu_tdp_w": 250,   # per-GPU watts
+    "ram_w": 20,        # system/ram etc
+    "other_w": 30       # misc platform overhead
+}
+
+def _seeded_rng(seed="project"):
+    return random.Random(seed)
+
+def _util_profile_day(idx):
+    """24*2 half-hour bins → return utilization 0..1 for hour bins we’ll build here."""
+    # Simple diurnal: morning ramp, mid-day plateau, evening taper
+    hour = idx
+    base = 0.25 + 0.45 * math.sin((hour-8) * math.pi/12)  # peaks around mid-day
+    return max(0.05, min(0.95, base))
+
+def _make_series(range_key: str, spec: dict):
+    """
+    Build labels + kWh per bin for:
+      - day: 24 hourly bins
+      - month: 30 daily bins (dummy month)
+      - year: 12 monthly bins
+    """
+    rng = _seeded_rng("project-usage")
+    labels, kwh = [], []
+
+    # Base device power (Watts) when "utilization==1"
+    full_watts = (
+        spec["cpu_count"] * spec["cpu_tdp_w"] +
+        spec["gpu_count"] * spec["gpu_tdp_w"] +
+        spec["ram_w"] + spec["other_w"]
+    )
+
+    if range_key == "day":
+        # 24 hourly bins, utilization varies by hour
+        for h in range(24):
+            util = _util_profile_day(h) + rng.uniform(-0.05, 0.05)
+            util = max(0.05, min(0.95, util))
+            watts = full_watts * util
+            kwh.append(round(watts / 1000 * 1.0, 3))  # 1 hour
+            labels.append(f"{str(h).zfill(2)}:00")
+
+    elif range_key == "month":
+        # 30 days; weekday/weekend modulation
+        for d in range(1, 31):
+            weekday = (d % 7) not in (6, 0)  # simple pattern; replace with real calendar if needed
+            util = (0.55 if weekday else 0.35) + rng.uniform(-0.08, 0.08)
+            util = max(0.05, min(0.95, util))
+            hours = 8 if weekday else 4  # active hours per day
+            kwh.append(round(full_watts / 1000 * hours, 3))
+            labels.append(f"D{d}")
+
+    elif range_key == "year":
+        # 12 months; seasonal modulation
+        for m in range(1, 13):
+            season = (0.6 if m in (2,3,10,11) else 0.5)  # more usage in shoulder months
+            util = season + rng.uniform(-0.07, 0.07)
+            util = max(0.05, min(0.95, util))
+            hours = 8 * 22  # ~22 working days x 8h
+            kwh.append(round(full_watts / 1000 * hours * util, 2))
+            labels.append(["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m-1])
+    else:
+        return [], []
+
+    return labels, kwh
+
+def project_usage_api(request):
+    """
+    Returns estimated electricity usage for a project.
+    Query params:
+      - range: day | month | year
+      - view: elec | carbon   (client uses for display; server returns elec kWh)
+      - (optional) tdp_* to override default spec, e.g. ?cpu_count=16&gpu_count=2...
+    Replace internals with DB lookups later.
+    """
+    range_key = request.GET.get("range", "day").lower()
+    if range_key not in ("day", "month", "year"):
+        return HttpResponseBadRequest("range must be day|month|year")
+
+    # Allow overrides via query string for quick testing
+    spec = DEFAULT_TDP_SPEC.copy()
+    for key in ("cpu_count","cpu_tdp_w","gpu_count","gpu_tdp_w","ram_w","other_w"):
+        if key in request.GET:
+            try:
+                spec[key] = float(request.GET[key]) if key.endswith("_w") else int(request.GET[key])
+            except ValueError:
+                pass
+
+    labels, kwh = _make_series(range_key, spec)
+    total_kwh = round(sum(kwh), 3)
+
+    return JsonResponse({
+        "range": range_key,
+        "labels": labels,
+        "kwh": kwh,
+        "total_kwh": total_kwh,
+        "spec": spec,
+        # Note: client will convert to CO2e using CI factors (can also be server-side later)
+    })

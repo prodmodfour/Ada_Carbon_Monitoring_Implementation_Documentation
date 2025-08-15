@@ -114,6 +114,54 @@
     </div>
   </section>
 
+
+<!-- Estimated Electricity Usage (Project) -->
+<section class="usage-card">
+  <div class="usage-head">
+    <div>
+      <div class="usage-title">Estimated Electricity Usage (Project)</div>
+    </div>
+    <div class="usage-controls">
+      <div class="seg">
+        <button class="seg-btn active" data-view="elec" aria-pressed="true">Electricity</button>
+        <button class="seg-btn" data-view="carbon" aria-pressed="false">Carbon</button>
+      </div>
+      <div class="seg">
+        <button class="seg-btn active" data-range="day" aria-pressed="true">Day</button>
+        <button class="seg-btn" data-range="month" aria-pressed="false">Month</button>
+        <button class="seg-btn" data-range="year" aria-pressed="false">Year</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="usage-body">
+    <div class="usage-chart">
+      <canvas id="usageChart"></canvas>
+    </div>
+    <aside class="usage-metrics">
+      <div class="metric-card">
+        <div class="metric-title" id="metricTitle">Electricity equivalency</div>
+        <ul class="metric-list" id="metricList">
+          <!-- filled by JS -->
+        </ul>
+      </div>
+      <div class="metric-card">
+        <div class="metric-title">Totals</div>
+        <ul class="metric-list" id="metricTotals">
+          <!-- filled by JS -->
+        </ul>
+      </div>
+    </aside>
+  </div>
+
+  <div class="usage-note" id="usageNote"></div>
+  <div class="ci-error hidden" id="usageErr" role="alert">
+    <span id="usageErrMsg">Unable to load usage.</span>
+    <button id="usageRetry" class="pill">Retry</button>
+  </div>
+</section>
+
+
       <!-- Workspace list -->
       {% if workspaces %}
         <h2 class="workspaces-heading">Your Workspaces</h2>
@@ -521,6 +569,135 @@ elHelpClose.addEventListener('click', closeHelp);
   selectWorkingDay();
 })();
 </script>
-
+<script>
+  (() => {
+    const $  = (s) => document.querySelector(s);
+    const $$ = (s) => Array.from(document.querySelectorAll(s));
+  
+    // --- constants (easy to tweak or move server-side later) ---
+    const CI_G_PER_KWH_DEFAULT = 220;   // used for month/year (or fallback)
+    const CAR_KG_PER_KM        = 0.171; // kg CO2e per km (avg passenger car)
+    const TREE_KG_PER_YEAR     = 21;    // kg CO2e absorbed per tree-year (placeholder)
+    const PARIS_DUBAI_KG       = 1000;  // reference CO2e for an economy seat (placeholder)
+  
+    let currentView = 'elec';   // elec|carbon
+    let currentRange = 'day';   // day|month|year
+    let chart;
+  
+    const elChart = $('#usageChart').getContext('2d');
+    const elMetrics = $('#metricList');
+    const elTotals  = $('#metricTotals');
+    const elTitle   = $('#metricTitle');
+    const elNote    = $('#usageNote');
+    const elErr     = $('#usageErr');
+    const elErrMsg  = $('#usageErrMsg');
+  
+    // helpers
+    function fmt(n, digits=0) { return Number(n).toLocaleString(undefined, { maximumFractionDigits: digits }); }
+    function setSegActive(groupSel, btn){
+      $$(groupSel + ' .seg-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed','false'); });
+      btn.classList.add('active'); btn.setAttribute('aria-pressed','true');
+    }
+  
+    async function fetchUsage(range){
+      const url = `/api/project-usage?range=${encodeURIComponent(range)}`;
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    }
+  
+    function renderChart(labels, series, unitLabel){
+      const data = { labels, datasets: [{ data: series, borderWidth: 0, backgroundColor: 'rgba(66,133,244,0.7)' }] };
+      const options = {
+        responsive: true, maintainAspectRatio: false, resizeDelay: 150,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${fmt(ctx.parsed.y, 2)} ${unitLabel}` } } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { grid: { color: '#eee' }, ticks: { callback: (v) => v } }
+        }
+      };
+      if (chart) { chart.data = data; chart.options = options; chart.update(); }
+      else { chart = new Chart(elChart, { type: 'bar', data, options }); }
+    }
+  
+    function renderMetricsElec(totalKWh){
+      elTitle.textContent = 'Electricity equivalency';
+      elMetrics.innerHTML = `
+        <li><strong>${fmt(totalKWh,2)} kWh</strong> total</li>
+        <li>≈ ${fmt(totalKWh / 0.06)} light-bulb hours (60W)</li>
+        <li>≈ ${fmt(totalKWh / 0.065)} laptop hours (65W)</li>
+        <li>≈ ${fmt(totalKWh / 0.11)} kettle boils (0.11 kWh/boil)</li>
+      `;
+      elTotals.innerHTML = `
+        <li>Average per bin: ${fmt(totalKWh / Math.max(1, last.labels.length), 2)} kWh</li>
+      `;
+    }
+  
+    function renderMetricsCarbon(totalKWh, gPerKWh){
+      const kg = totalKWh * (gPerKWh / 1000);
+      elTitle.textContent = 'Carbon equivalency';
+      elMetrics.innerHTML = `
+        <li><strong>${fmt(kg,0)} kg CO₂e</strong> (at ${gPerKWh} g/kWh)</li>
+        <li>≈ ${fmt(kg / TREE_KG_PER_YEAR,1)} tree-years</li>
+        <li>≈ ${fmt(kg / CAR_KG_PER_KM,0)} car km</li>
+        <li>≈ ${fmt((kg / PARIS_DUBAI_KG) * 100,1)}% of a Paris→Dubai flight</li>
+      `;
+      elTotals.innerHTML = `
+        <li>Total electricity: ${fmt(last.total_kwh,2)} kWh</li>
+        <li>Average per bin: ${fmt(last.total_kwh / Math.max(1,last.labels.length), 2)} kWh</li>
+      `;
+    }
+  
+    // Cache last response for metrics
+    let last = { labels: [], kwh: [], total_kwh: 0 };
+  
+    async function load(range=currentRange, view=currentView){
+      try{
+        elErr.classList.add('hidden');
+        const data = await fetchUsage(range);
+        last = data;
+  
+        // Decide CI factor
+        let ci = CI_G_PER_KWH_DEFAULT;
+        if (view === 'carbon' && range === 'day') {
+          // For "day", we could call your existing CI proxy to compute a better average.
+          // To keep this fast, we’ll just use the default constant; replace here to aggregate real CI later.
+        }
+  
+        // Chart
+        const unit = (view === 'elec') ? 'kWh' : 'kg CO₂e';
+        const series = (view === 'elec')
+          ? data.kwh
+          : data.kwh.map(v => v * (ci/1000));  // kWh → kg at ci g/kWh
+  
+        renderChart(data.labels, series, unit);
+  
+        // Metrics
+        if (view === 'elec') renderMetricsElec(data.total_kwh);
+        else renderMetricsCarbon(data.total_kwh, ci);
+  
+        // Note (server assumptions)
+        const s = data.spec;
+        $('#usageNote').textContent =
+          `Assumptions: CPUs=${s.cpu_count}×${s.cpu_tdp_w}W, GPUs=${s.gpu_count}×${s.gpu_tdp_w}W, RAM≈${s.ram_w}W, Other≈${s.other_w}W.`;
+      }catch(err){
+        elErrMsg.textContent = `Unable to load usage (${err.message}).`;
+        elErr.classList.remove('hidden');
+      }
+    }
+  
+    // Controls
+    document.querySelector('.usage-controls').addEventListener('click', (e) => {
+      const btn = e.target.closest('.seg-btn'); if (!btn) return;
+      if (btn.dataset.view){ currentView = btn.dataset.view; setSegActive('.usage-controls', btn); load(); }
+      if (btn.dataset.range){ currentRange = btn.dataset.range; setSegActive('.usage-controls', btn); load(); }
+    });
+    $('#usageRetry').addEventListener('click', () => load());
+  
+    // Initial
+    load();
+  })();
+  </script>
+  
 </body>
 </html>
