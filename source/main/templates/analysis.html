@@ -192,10 +192,10 @@
 
   // Build request URL
   function buildUrl(from, to) {
-    // API expects UTC ISO; use minutes precision for half-hour slices
+    // send to our Django proxy (which calls the GB API server-side)
     const f = toIsoUTCMinute(new Date(from));
     const t = toIsoUTCMinute(new Date(to));
-    return `https://api.carbonintensity.org.uk/intensity/${encodeURIComponent(f)}/${encodeURIComponent(t)}`;
+    return `/api/ci?from=${encodeURIComponent(f)}&to=${encodeURIComponent(t)}`
   }
 
   // Compute best contiguous 3-hour window (6 half-hour slots)

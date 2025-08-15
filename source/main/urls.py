@@ -24,4 +24,5 @@ urlpatterns = [
          views.instrument_detail, 
          name='instrument_detail'),
     path('analysis/<str:source>/workspaces/<str:ws_id>/', views.workspace_detail, name='workspace_detail'),
+    path('api/ci', views.ci_proxy, name='ci_proxy'),
 ]

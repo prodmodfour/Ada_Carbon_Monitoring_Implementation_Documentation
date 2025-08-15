@@ -1,10 +1,12 @@
 import random
 
 import uuid
+import urllib.request, json
 from datetime import timedelta
-from django.http import HttpRequest, HttpResponse  
+from django.http import HttpRequest, HttpResponse, JsonResponse, HttpResponseBadRequest
 from django.shortcuts import render, redirect
 from django.utils import timezone
+from urllib.parse import quote
 
 def _ws_key(source: str) -> str:
     # keep workspaces separate per source (isis, clf, ...)
@@ -201,3 +203,29 @@ def workspace_detail(request, source: str, ws_id: str):
         "ws": ws,
     }
     return render(request, "workspace_detail.html", context)
+
+
+def ci_proxy(request):
+    """
+    Server-side proxy for the GB Carbon Intensity API.
+    Accepts GET ?from=<ISO8601 UTC> & to=<ISO8601 UTC>
+    and returns the API JSON. Avoids browser CORS issues.
+    """
+    frm = request.GET.get('from')
+    to = request.GET.get('to')
+    if not frm or not to:
+        return HttpResponseBadRequest("Query params 'from' and 'to' are required.")
+
+    base = "https://api.carbonintensity.org.uk/intensity"
+    # allow :, -, T, Z characters to pass through
+    safe = ":-TZ"
+    url = f"{base}/{quote(frm, safe=safe)}/{quote(to, safe=safe)}"
+
+    try:
+        with urllib.request.urlopen(url, timeout=12) as resp:
+            charset = resp.headers.get_content_charset() or "utf-8"
+            data = resp.read().decode(charset)
+            payload = json.loads(data)
+            return JsonResponse(payload)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=502)
