@@ -41,13 +41,20 @@
           {% for inst in instruments %}
           <a class="instrument-btn" href="{% url 'instrument_detail' source inst.name %}">
             <span class="inst-name">{{ inst.name }}</span>
-            <span class="inst-figures">
-              {{ inst.kwh_per_hour|floatformat:2 }} kWh/h ·
-              {{ inst.kg_per_hour|floatformat:2 }} kg&nbsp;CO₂e/h
+            <span class="inst-metrics">
+              <span class="inst-co2">
+                <i class="leaf" aria-hidden="true"></i>
+                {% if inst.g_per_hour %}{{ inst.g_per_hour }} gCO₂e/hour{% else %}
+                  {{ inst.kg_per_hour|floatformat:2 }} kg CO₂e/h
+                {% endif %}
+              </span>
+              <span class="sep">·</span>
+              <span class="inst-power">{{ inst.kwh_per_hour|floatformat:2 }} kWh/h</span>
             </span>
           </a>
           {% endfor %}
         </div>
+        
         
       </div>
     </main>
