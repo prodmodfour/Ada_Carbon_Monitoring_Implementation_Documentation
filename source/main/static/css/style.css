@@ -686,3 +686,31 @@ html, body {
 @media (min-width: 1100px) {
   .card-grid { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* Aligned, close-together metric pair (GHG + SCI) */
+.home-metrics{
+  --metric-size: 170px;                 /* tweak 160–180 to taste */
+  display: grid;
+  grid-template-columns: repeat(2, var(--metric-size));
+  grid-auto-rows: var(--metric-size);
+  gap: 80px;                         
+  justify-content: center;              /* center under the hero */
+  align-items: start;                    /* align card tops */
+  margin-bottom: 18px;
+}
+
+.home-metrics .metric{
+  width: var(--metric-size);
+  height: var(--metric-size);
+  margin: 0;                            /* kill stray margins */
+  align-self: start;                    /* prevent baseline wobble */
+  display: flex;                        /* keep your existing internals */
+  flex-direction: column;
+  position: relative;
+  overflow: visible;                    /* popovers can escape */
+}
+
+/* keep header/number spacing consistent inside each card */
+.home-metrics .sci-head{ margin: 0 0 2px; align-items: flex-end; }
+.home-metrics .sci-value-wrap{ display:flex; align-items:center; min-height: 86px; }
+.home-metrics .sci-help-btn{ width: 24px; height: 24px; }
