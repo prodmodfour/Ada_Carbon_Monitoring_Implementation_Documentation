@@ -33,6 +33,7 @@
 
 
 * Virtual Capacity Curves (Electricity view and carbon view)
+  * Needs more research on whether other facilities have used something simlar
 * Carbon Intensity Forecast
 * Estimated electricity usage of a project over x time period (Selectable data range or day, month, year). This uses TDP calculations.
     * Carbon footprint view
