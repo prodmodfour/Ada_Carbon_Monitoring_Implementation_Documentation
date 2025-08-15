@@ -52,6 +52,47 @@
           </a>
         </div>
       </div>
+        <!-- Carbon Intensity Forecast (GB) -->
+  <section class="ci-card">
+    <div class="ci-header">
+      <div>
+        <div class="ci-title">Carbon Intensity Forecast (GB)</div>
+        <div class="ci-caption">
+          All times local. <span>Source: GB Carbon Intensity API.</span>
+          <span id="ciRefreshed" aria-live="polite"></span>
+        </div>
+      </div>
+
+      <div class="ci-controls">
+        <button class="pill active" data-range="working" aria-pressed="true" title="08:00–17:00">
+          Working day (8:00–17:00)
+        </button>
+        <button class="pill" data-range="24h" aria-pressed="false">Next 24 hours</button>
+        <button class="pill" data-range="48h" aria-pressed="false">Next 48 hours</button>
+        <button class="pill" data-range="custom" aria-pressed="false">Custom</button>
+
+        <div id="ciCustom" class="ci-custom hidden" aria-hidden="true">
+          <label>
+            From
+            <input type="datetime-local" id="ciFrom">
+          </label>
+          <label>
+            To
+            <input type="datetime-local" id="ciTo">
+          </label>
+          <button id="ciApply" class="pill">Apply</button>
+        </div>
+      </div>
+    </div>
+
+    <canvas id="ciForecastChart" height="300"></canvas>
+
+    <div class="ci-note" id="ciNote" role="note"></div>
+    <div class="ci-error hidden" id="ciError" role="alert">
+      <span id="ciErrorMsg">Unable to load forecast.</span>
+      <button id="ciRetry" class="pill">Retry</button>
+    </div>
+  </section>
 
       <!-- Workspace list -->
       {% if workspaces %}
@@ -99,5 +140,324 @@
 
     </main>
   </div>
+
+
+  <!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+(() => {
+  // ===== Utilities =====
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+  // Format a Date to 'YYYY-MM-DDTHH:MMZ' (UTC minutes precision)
+  function toIsoUTCMinute(d) {
+    const pad = (n) => String(n).padStart(2, '0');
+    return d.getUTCFullYear() + '-' + pad(d.getUTCMonth()+1) + '-' + pad(d.getUTCDate())
+      + 'T' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + 'Z';
+  }
+
+  // Round up to the next :00 / :30 boundary (local)
+  function nextHalfHour(dt) {
+    const d = new Date(dt);
+    const m = d.getMinutes();
+    if (m === 0 || m === 30) return d;
+    d.setMinutes(m < 30 ? 30 : 0);
+    if (m > 30) d.setHours(d.getHours() + 1);
+    d.setSeconds(0, 0);
+    return d;
+  }
+
+  // Working day window (local) per your rules:
+  // before 08:00 => today 08:00–17:00; after 17:00 => tomorrow 08:00–17:00; Sat/Sun allowed as working days
+  function workingDayWindow(nowLocal) {
+    const base = new Date(nowLocal);
+    const h = base.getHours();
+    const day = new Date(base);
+    if (h >= 17) day.setDate(day.getDate() + 1); // roll to tomorrow
+    // else before 08:00 or within the day -> keep today
+    const from = new Date(day); from.setHours(8,0,0,0);
+    const to   = new Date(day); to.setHours(17,0,0,0);
+    return { from, to };
+  }
+
+  // Cap to 48 hours; return possibly trimmed range and flag
+  function cap48(from, to) {
+    const maxMs = 48 * 60 * 60 * 1000;
+    let capped = false;
+    if ((to - from) > maxMs) { to = new Date(from.getTime() + maxMs); capped = true; }
+    return { from, to, capped };
+  }
+
+  // Build request URL
+  function buildUrl(from, to) {
+    // API expects UTC ISO; use minutes precision for half-hour slices
+    const f = toIsoUTCMinute(new Date(from));
+    const t = toIsoUTCMinute(new Date(to));
+    return `https://api.carbonintensity.org.uk/intensity/${encodeURIComponent(f)}/${encodeURIComponent(t)}`;
+  }
+
+  // Compute best contiguous 3-hour window (6 half-hour slots)
+  function best3hWindow(points) {
+    if (!points || points.length < 6) return null;
+    let best = { i: 0, avg: Infinity };
+    let sum = 0;
+    for (let i = 0; i < 6; i++) sum += points[i];
+    best = { i: 0, avg: sum / 6 };
+    for (let i = 6; i < points.length; i++) {
+      sum += points[i] - points[i - 6];
+      const avg = sum / 6;
+      if (avg < best.avg) best = { i: i - 5, avg };
+    }
+    return best; // {i, avg}
+  }
+
+  // ===== DOM refs =====
+  const elChart = $('#ciForecastChart');
+  const elNote = $('#ciNote');
+  const elError = $('#ciError');
+  const elErrMsg = $('#ciErrorMsg');
+  const elRetry = $('#ciRetry');
+  const elRefreshed = $('#ciRefreshed');
+  const elCustomWrap = $('#ciCustom');
+  const elFrom = $('#ciFrom');
+  const elTo = $('#ciTo');
+
+  // ===== Chart state =====
+  let chart;
+  const state = {
+    labels: [],     // e.g., "13:00", "13:30", ...
+    values: [],     // forecast gCO2/kWh
+    from: null,
+    to: null,
+    band: null,     // [startIndex, endIndex] inclusive for best 3h
+    nowIndex: null, // index for "Now" marker or null
+  };
+
+  // Highlight plugin: draw the best 3h band + "Now" line
+  const ciHighlightPlugin = {
+    id: 'ciHighlight',
+    afterDatasetsDraw(c, args, opts) {
+      const { ctx, chartArea: {left, right, top, bottom}, scales: {x} } = c;
+
+      // Best 3h band
+      if (state.band && state.values.length > 1) {
+        const [i0, i1] = state.band;
+        const x0 = x.getPixelForValue(i0);
+        const x1 = x.getPixelForValue(i1);
+        const tick = Math.abs(x.getPixelForValue(1) - x.getPixelForValue(0)) || 10;
+        ctx.save();
+        ctx.fillStyle = 'rgba(76, 175, 80, 0.12)'; // subtle green
+        ctx.fillRect(x0 - tick/2, top, (x1 - x0) + tick, bottom - top);
+        ctx.restore();
+      }
+
+      // Now marker
+      if (state.nowIndex != null) {
+        const xNow = x.getPixelForValue(state.nowIndex);
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4,3]);
+        ctx.beginPath();
+        ctx.moveTo(xNow, top);
+        ctx.lineTo(xNow, bottom);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+  };
+
+  // Create or update chart
+  function renderChart() {
+    const data = {
+      labels: state.labels,
+      datasets: [{
+        label: 'Forecast (gCO₂/kWh)',
+        data: state.values,
+        borderWidth: 2,
+        tension: 0.2,
+        fill: false,
+      }]
+    };
+    const options = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+      scales: {
+        x: { type: 'category', grid: { display: false } },
+        y: { grid: { color: '#eee' }, ticks: { callback: (v) => v + '' } }
+      }
+    };
+
+    if (chart) {
+      chart.data = data;
+      chart.update();
+    } else {
+      chart = new Chart(elChart.getContext('2d'), {
+        type: 'line',
+        data,
+        options,
+        plugins: [ciHighlightPlugin]
+      });
+    }
+  }
+
+  // Populate DOM note: best band + any warnings
+  function setNote(from, to, capped, best, labels) {
+    const parts = [];
+    if (best) {
+      const start = labels[best.i];
+      const end = labels[Math.min(best.i + 5, labels.length - 1)];
+      parts.push(`Best 3h window: ${start}–${end} (avg ${Math.round(best.avg)} gCO₂/kWh)`);
+    }
+    if (capped) {
+      parts.push(`Note: Range capped to 48 hours; forecasting beyond 48h is less accurate.`);
+    }
+    elNote.textContent = parts.join(' · ');
+  }
+
+  // Compute labels and indices in local time
+  function buildLabels(items) {
+    const labels = [];
+    const now = new Date();
+    state.nowIndex = null;
+
+    items.forEach((it, idx) => {
+      // API 'from' timestamps are ISO UTC; parse and render as local "HH:MM"
+      const start = new Date(it.from);
+      const hh = String(start.getHours()).padStart(2,'0');
+      const mm = String(start.getMinutes()).padStart(2,'0');
+      labels.push(`${hh}:${mm}`);
+
+      if (start <= now && new Date(it.to) > now) state.nowIndex = idx;
+    });
+    return labels;
+  }
+
+  // Fetch & draw for a given local range
+  async function loadRange(fromLocal, toLocal, { clamp48 = true } = {}) {
+    const { from, to, capped } = clamp48 ? cap48(fromLocal, toLocal) : { from: fromLocal, to: toLocal, capped: false };
+    const url = buildUrl(from, to);
+
+    elError.classList.add('hidden');
+    elNote.textContent = 'Loading forecast…';
+
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+
+      const items = (json && json.data) ? json.data : [];
+      const values = items.map(d => d.intensity && (d.intensity.forecast ?? d.intensity.actual ?? null)).filter(v => v != null);
+
+      state.labels = buildLabels(items);
+      state.values = values;
+      state.from = from;
+      state.to = to;
+
+      // Best 3h window
+      const best = best3hWindow(values);
+      state.band = best ? [best.i, best.i + 5] : null;
+
+      renderChart();
+      setNote(from, to, capped, best, state.labels);
+      elRefreshed.textContent = `· refreshed ${new Date().toLocaleTimeString()}`;
+    } catch (err) {
+      elErrMsg.textContent = `Unable to load forecast (${err.message}).`;
+      elError.classList.remove('hidden');
+      elNote.textContent = '';
+    }
+  }
+
+  // ===== Controls =====
+  function setActive(btn) {
+    $$('.ci-controls .pill').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed','false'); });
+    btn.classList.add('active');
+    btn.setAttribute('aria-pressed','true');
+  }
+
+  function initCustomInputs(defaultFrom, defaultTo) {
+    // Convert to local "YYYY-MM-DDTHH:MM"
+    const toLocalInput = (d) => {
+      const pad = (n) => String(n).padStart(2,'0');
+      const dt = new Date(d);
+      return dt.getFullYear() + '-' + pad(dt.getMonth()+1) + '-' + pad(dt.getDate()) + 'T' + pad(dt.getHours()) + ':' + pad(dt.getMinutes());
+    };
+    elFrom.value = toLocalInput(defaultFrom);
+    elTo.value = toLocalInput(defaultTo);
+  }
+
+  // Default: Working day (8–17) per your rules
+  function selectWorkingDay() {
+    const { from, to } = workingDayWindow(new Date());
+    setActive($('[data-range="working"]'));
+    elCustomWrap.classList.add('hidden'); elCustomWrap.setAttribute('aria-hidden','true');
+    loadRange(from, to, { clamp48: true });
+  }
+
+  function select24h() {
+    const start = nextHalfHour(new Date());
+    const end = new Date(start.getTime() + 24*60*60*1000);
+    setActive($('[data-range="24h"]'));
+    elCustomWrap.classList.add('hidden'); elCustomWrap.setAttribute('aria-hidden','true');
+    loadRange(start, end, { clamp48: true });
+  }
+
+  function select48h() {
+    const start = nextHalfHour(new Date());
+    const end = new Date(start.getTime() + 48*60*60*1000);
+    setActive($('[data-range="48h"]'));
+    elCustomWrap.classList.add('hidden'); elCustomWrap.setAttribute('aria-hidden','true');
+    loadRange(start, end, { clamp48: true });
+  }
+
+  function selectCustom() {
+    // Default custom range = next 6 hours starting next half hour
+    const start = nextHalfHour(new Date());
+    const end = new Date(start.getTime() + 6*60*60*1000);
+    setActive($('[data-range="custom"]'));
+    elCustomWrap.classList.remove('hidden'); elCustomWrap.setAttribute('aria-hidden','false');
+    initCustomInputs(start, end);
+  }
+
+  // Click handlers
+  $('.ci-controls').addEventListener('click', (e) => {
+    const btn = e.target.closest('.pill');
+    if (!btn) return;
+    const r = btn.dataset.range;
+    if (r === 'working') return selectWorkingDay();
+    if (r === '24h')     return select24h();
+    if (r === '48h')     return select48h();
+    if (r === 'custom')  return selectCustom();
+  });
+
+  $('#ciApply').addEventListener('click', () => {
+    const from = new Date($('#ciFrom').value);
+    const to = new Date($('#ciTo').value);
+    if (isNaN(from.getTime()) || isNaN(to.getTime()) || to <= from) {
+      elErrMsg.textContent = 'Please provide a valid custom range (To must be after From).';
+      elError.classList.remove('hidden');
+      return;
+    }
+    loadRange(from, to, { clamp48: true });
+  });
+
+  $('#ciRetry').addEventListener('click', () => {
+    const active = document.querySelector('.ci-controls .pill.active');
+    if (!active) return selectWorkingDay();
+    const r = active.dataset.range;
+    if (r === 'working') return selectWorkingDay();
+    if (r === '24h')     return select24h();
+    if (r === '48h')     return select48h();
+    if (r === 'custom')  return $('#ciApply').click();
+  });
+
+  // Initial load
+  selectWorkingDay();
+})();
+</script>
+
 </body>
 </html>
