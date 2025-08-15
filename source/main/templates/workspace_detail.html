@@ -1,0 +1,99 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ source_title }} - {{ ws.title }}</title>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+<header class="top-nav">
+  <div class="left">
+    <img src="{% static 'images/small_atom.png' %}" alt="" class="small-icon">
+    <span class="analysis-title">{{ source_title }}</span>
+  </div>
+  <div class="right"><span class="logout-link">Logout</span></div>
+</header>
+
+<div class="page-body">
+  <nav class="sidebar">
+    <ul>
+      <li><img src="{% static 'images/icon_workspaces.png' %}" alt="">Workspaces</li>
+      <li><img src="{% static 'images/icon_data.png' %}" alt="">Data</li>
+      <li><img src="{% static 'images/icon_experiments.png' %}" alt="">Experiments</li>
+      <li><img src="{% static 'images/icon_question.png' %}" alt="">Help</li>
+      <li><img src="{% static 'images/icon_info.png' %}" alt="">About</li>
+    </ul>
+  </nav>
+
+  <main class="content">
+    <a href="{% url 'analysis' source %}" class="back-button">
+      <img src="{% static 'images/back_arrow.png' %}" alt="Back"> Back
+    </a>
+
+    <div class="instrument-detail-center">
+      <div class="ws-detail-card">
+        <div class="ws-detail-header">
+          <img src="{% static 'images/icon_new_workspace.png' %}" class="analysis-card-icon" alt="">
+          <span>{{ ws.title }}</span>
+        </div>
+
+        <div class="ws-section">
+          <div class="ws-section-title">Workspace details</div>
+          <div class="ws-kv">
+            <div>Hostname:</div><div>{{ ws.hostname }}</div>
+            <div>Created:</div><div>{{ ws.created_at|date:"Y-m-d\\TH:i:s\\Z" }}</div>
+            <div>Last activity:</div><div>{{ ws.last_activity|date:"Y-m-d\\TH:i:s\\Z" }}</div>
+            <div>Inactivity recycle date:</div><div>{{ ws.recycle_at|date:"Y-m-d\\TH:i:s\\Z" }} <span class="ws-dot">i</span></div>
+          </div>
+        </div>
+
+        <div class="ws-section">
+          <div class="ws-section-title">Included Software</div>
+          <div class="ws-muted">These software releases, and versions, were installed when the workspace was created.</div>
+          <div class="ws-muted">If you have installed/upgraded any packages yourself, those changes will not be shown here.</div>
+          <div class="installed-software-toggle" style="margin-top:10px;">
+            Installed Software <span class="chev">▾</span>
+          </div>
+        </div>
+
+        <div class="ws-section">
+          <div class="ws-section-title">Workspace Health</div>
+          <div class="ws-kv">
+            <div>Overall health:</div><div>{{ ws.health.overall }}</div>
+            <div>Babylon mount:</div><div>{{ ws.health.babylon }}</div>
+            <div>Ceph mount:</div><div>{{ ws.health.ceph }}</div>
+          </div>
+        </div>
+
+        <div class="ws-section">
+          <div class="ws-section-title">Delete Workspace</div>
+          <div class="ws-muted">Deleting your Workspace will close all running applications. Data saved to your home directory or Experiment directories will persist.</div>
+          <form method="post" style="margin-top:12px;">
+            {% csrf_token %}
+            <input type="hidden" name="delete" value="1">
+            <button class="delete-btn" type="submit">DELETE</button>
+          </form>
+        </div>
+
+        <div class="ws-section">
+          <div class="ws-section-title">Workspace sharing</div>
+          <table class="ws-share-table">
+            <tr><th>Name</th></tr>
+            <tr><td>Ashraf Hussain <em>(Owner)</em></td></tr>
+          </table>
+
+          <div class="ws-share-link">
+            <input type="text" readonly value="https://example.local/workspaces/share/{{ ws.id }}?tag={{ source }}" />
+            <button disabled title="Copy">📋</button>
+            <button disabled title="Refresh">🔄</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

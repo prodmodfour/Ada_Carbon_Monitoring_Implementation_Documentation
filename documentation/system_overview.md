@@ -30,6 +30,24 @@
 
 ## Data Display Modules
 
+
+
+* Virtual Capacity Curves (Electricity view and carbon view)
+* Carbon Intensity Forecast
+* Estimated electricity usage of a project over x time period (Selectable data range or day, month, year). This uses TDP calculations.
+    * Carbon footprint view
+    * Carbon equivalency metrics
+* SCI Score
+* GHG Score
+* Workspace figures
+    * Idle Usage Counter per workspace
+    * Best time in work hours (8 am to 5 PM) to use in terms of carbon intensity
+* Service figures
+    * Estimated electricity usage of the service over x time period (Selectable data range or day, month, year). This uses TDP calculations.
+        * Carbon footprint view
+        * Carbon equivalency metrics
+
+
 ## Real time configuration changes
 Uses Django Channels
 We keep data loaded in various models

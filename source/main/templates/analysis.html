@@ -64,7 +64,9 @@
                   <img src="{% static 'images/icon_new_workspace.png' %}" alt="" class="analysis-card-icon" />
                   <span>{{ ws.title }}</span>
                 </div>
-                <div class="workspace-card-gear">⚙</div>
+                <!-- Gear MUST be inside .workspace-card-top -->
+                <a class="workspace-card-gear" title="Workspace details"
+                   href="{% url 'workspace_detail' source ws.id %}">⚙</a>
               </div>
 
               <div class="workspace-owner">Ashraf Hussain</div>

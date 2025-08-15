@@ -510,3 +510,22 @@ html, body {
   cursor: not-allowed; 
   color: #616161;
 }
+
+
+.ws-detail-card{
+  background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:16px 16px 20px;
+  max-width:920px;box-shadow:0 1px 2px rgba(0,0,0,.05);
+}
+.ws-detail-header{display:flex;align-items:center;gap:8px;font-weight:600;color:#37474f;margin-bottom:8px;}
+.ws-section{margin-top:18px;}
+.ws-section-title{font-weight:600;color:#607d8b;margin-bottom:8px;}
+.ws-muted{color:#757575;font-size:13px;}
+.ws-kv{display:grid;grid-template-columns:220px 1fr;gap:6px 12px;color:#455a64;}
+.ws-kv div:nth-child(odd){color:#78909c;}
+.ws-dot{display:inline-block;font-size:11px;background:#eceff1;border-radius:50%;width:16px;height:16px;line-height:16px;text-align:center;margin-left:6px;color:#607d8b;}
+.ws-share-table{width:100%;border-collapse:collapse;margin-top:6px;border-top:1px solid #e0e0e0;}
+.ws-share-table th, .ws-share-table td{padding:8px 2px;border-bottom:1px solid #eee;text-align:left;color:#455a64;}
+.ws-share-link{margin-top:10px;display:flex;gap:6px;}
+.ws-share-link input{flex:1;border:1px solid #e0e0e0;border-radius:4px;padding:8px;background:#fafafa;color:#616161;}
+.ws-share-link button{border:1px solid #e0e0e0;border-radius:4px;background:#fff;padding:8px 10px;color:#616161;cursor:not-allowed;}
+.delete-btn{border:1px solid #e0e0e0;background:#fff;border-radius:4px;padding:8px 14px;font-size:12px;color:#d84315;cursor:pointer;}
