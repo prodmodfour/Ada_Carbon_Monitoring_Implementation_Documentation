@@ -23,7 +23,7 @@ SECRET_KEY = 'django-insecure-change-me'
 DEBUG = True
 
 # Allow all hosts during development; adjust in production.
-ALLOWED_HOSTS: list[str] = []
+ALLOWED_HOSTS = ['*']
 
 # Application definition
 INSTALLED_APPS = [
