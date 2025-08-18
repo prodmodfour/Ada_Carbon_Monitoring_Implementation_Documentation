@@ -10,7 +10,7 @@ environment. See ``manage.py`` for more information.
 """
 
 import os
-from django.core.wsgi import get_wsgi_application  # type: ignore
+from django.core.wsgi import get_wsgi_application  
 
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ada_project.settings')

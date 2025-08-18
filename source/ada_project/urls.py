@@ -7,7 +7,7 @@ all routing to the ``main`` application so that view logic lives in
 ``main.views``.
 """
 
-from django.urls import include, path  # type: ignore
+from django.urls import include, path  
 
 urlpatterns = [
     path('', include('main.urls')),

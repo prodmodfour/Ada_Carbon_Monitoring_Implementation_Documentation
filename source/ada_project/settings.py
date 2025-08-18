@@ -1,14 +1,4 @@
-"""
-Django settings for Ada mock project.
 
-This settings module provides a minimal configuration suitable for
-development and demonstration purposes. It intentionally omits
-production-hardening features such as secure secret keys and database
-configuration since the goal of this repository is to mock the
-navigation and look of an existing web interface. If you intend to
-extend this project into a fully functional application, you should
-review and adjust these settings accordingly.
-"""
 
 from pathlib import Path
 
