@@ -9,6 +9,14 @@ from django.utils import timezone
 from urllib.parse import quote
 import math
 import requests
+import time
+from django.conf import settings
+
+import hashlib
+
+from django.utils.timezone import now as tz_now
+
+from .models import ProjectEnergy
 
 # ========= DEBUG PRINT HELPER =========
 def _dbg(enabled, *args):
@@ -16,6 +24,41 @@ def _dbg(enabled, *args):
     if enabled:
         print("[ENERGY DEBUG]", *args)
 # =====================================
+
+
+def _spec_hash(spec: dict) -> str:
+    # Stable hash of the spec so overrides land in a separate cache row
+    payload = (
+        f"cpu_count={spec.get('cpu_count')};"
+        f"cpu_tdp_w={spec.get('cpu_tdp_w')};"
+        f"gpu_count={spec.get('gpu_count')};"
+        f"gpu_tdp_w={spec.get('gpu_tdp_w')};"
+        f"ram_w={spec.get('ram_w')};"
+        f"other_w={spec.get('other_w')}"
+    ).encode("utf-8")
+    return hashlib.sha1(payload).hexdigest()
+
+def _cache_ttl_seconds(range_key: str) -> int:
+    # Reasonable defaults; tweak if you like
+    return {
+        "day":   3600,      # refresh hourly
+        "month": 24*3600,   # refresh daily
+        "year":  24*3600,   # refresh daily (or 7*86400 if you prefer weekly)
+    }[range_key]
+
+def _bin_meta(range_key: str):
+    # Mirror your _bin_setup so we can record the metadata we used
+    import time as _t
+    end = int(_t.time())
+    if range_key == "day":
+        start, step_s = end - 24*3600, 3600
+    elif range_key == "month":
+        start, step_s = end - 30*86400, 86400
+    elif range_key == "year":
+        start, step_s = end - 365*86400, 86400
+    else:
+        raise ValueError("range must be day|month|year")
+    return start, end, step_s
 
 
 def _ws_key(source: str) -> str:
@@ -342,23 +385,25 @@ def _make_series(range_key: str, spec: dict):
 
 def project_usage_api(request):
     """
-    Real project usage backed by Prometheus (CPU + dynamic RAM) with debug prints.
+    Uses DB cache first; recomputes (Prometheus or mock) when stale or forced.
     Query params:
       - range: day|month|year
       - source: clf|isis|diamond
-      - debug: 1|true to print to console
-      - (optional) tdp_* overrides, e.g. ?cpu_tdp_w=10&ram_w=25
+      - debug: 1|true -> console prints
+      - force_refresh: 1|true -> bypass cache
+      - (optional) tdp_* overrides kept for testing
     """
     debug = str(request.GET.get("debug", "")).lower() in ("1", "true", "yes", "on")
-    range_key = request.GET.get("range", "day").lower()
+    range_key = (request.GET.get("range") or "day").lower()
     source = (request.GET.get("source") or "").lower()
+    force_refresh = str(request.GET.get("force_refresh", "")).lower() in ("1", "true", "yes", "on")
 
     _dbg(debug, "REQUEST", {"range": range_key, "source": source, "qs": dict(request.GET)})
 
     if range_key not in ("day", "month", "year"):
         return HttpResponseBadRequest("range must be day|month|year")
 
-    # TDP spec (allow overrides for testing)
+    # TDP spec (allow overrides)
     spec = DEFAULT_TDP_SPEC.copy()
     for key in ("cpu_count","cpu_tdp_w","gpu_count","gpu_tdp_w","ram_w","other_w"):
         if key in request.GET:
@@ -367,8 +412,29 @@ def project_usage_api(request):
                 spec[key] = val
             except Exception:
                 pass
-    _dbg(debug, "SPEC", spec)
+    shash = _spec_hash(spec)
+    _dbg(debug, "SPEC", {**spec, "_hash": shash})
 
+    # 1) Try cache
+    ttl = _cache_ttl_seconds(range_key)
+    if source in ("clf", "isis", "diamond") and not force_refresh:
+        qs = ProjectEnergy.objects.filter(source=source, range_key=range_key, spec_hash=shash).order_by("-updated_at")
+        row = qs.first()
+        if row:
+            age = (tz_now() - row.updated_at).total_seconds()
+            _dbg(debug, "CACHE_HIT", {"id": row.id, "age_s": int(age), "ttl_s": ttl})
+            if age < ttl:
+                data = {
+                    "range": range_key,
+                    "labels": row.labels,
+                    "kwh": row.kwh,
+                    "total_kwh": row.total_kwh,
+                    "spec": spec,
+                }
+                _dbg(debug, "RESPONSE(DB)", {"labels_len": len(row.labels), "kwh_len": len(row.kwh), "total_kwh": row.total_kwh})
+                return JsonResponse(data)
+
+    # 2) Compute (Prometheus for known sources; mock otherwise)
     try:
         if source in PROJECT_TO_LABELVAL:
             labels, kwh = _prometheus_usage_series(source, range_key, spec, debug)
@@ -380,6 +446,27 @@ def project_usage_api(request):
         labels, kwh = _make_series(range_key, spec)
 
     total_kwh = round(sum(kwh), 3)
+
+    # 3) Save to DB (best effort; don’t fail the request if DB save fails)
+    if source in ("clf", "isis", "diamond"):
+        try:
+            s, e, step_s = _bin_meta(range_key)
+            row = ProjectEnergy.objects.create(
+                source=source,
+                range_key=range_key,
+                spec_hash=shash,
+                spec_json=spec,
+                labels=labels,
+                kwh=kwh,
+                total_kwh=total_kwh,
+                start_unix=s,
+                end_unix=e,
+                step_seconds=step_s,
+            )
+            _dbg(debug, "CACHE_SAVE", {"id": row.id, "source": source, "range": range_key})
+        except Exception as db_e:
+            _dbg(debug, "CACHE_SAVE_ERR", repr(db_e))
+
     _dbg(debug, "RESPONSE", {"labels_len": len(labels), "kwh_len": len(kwh), "total_kwh": total_kwh})
     return JsonResponse({
         "range": range_key,
@@ -388,7 +475,6 @@ def project_usage_api(request):
         "total_kwh": total_kwh,
         "spec": spec,
     })
-
 
 
 # ---- SCI Score dummy API ----------------------------------------------------
@@ -610,7 +696,7 @@ def _prom_query_range(expr: str, start: int, end: int, step: str, debug=False):
         r = requests.get(
             url,
             params={"query": expr, "start": start, "end": end, "step": step},
-            timeout=30,
+            timeout=60,          # was 30
             verify=False,
         )
         r.raise_for_status()
@@ -622,18 +708,27 @@ def _prom_query_range(expr: str, start: int, end: int, step: str, debug=False):
         _dbg(debug, "Q_RANGE_ERR", repr(e))
         raise
 
+
 def _ts_map_from_matrix(result_obj, debug=False, tag=""):
-    series = result_obj.get("data", {}).get("result", [])
+    # Sum all series into {timestamp->sum(value)}, skipping bad points
+    series = (result_obj or {}).get("data", {}).get("result", []) or []
     acc = {}
     for s in series:
-        for ts, val in s.get("values", []):
+        for item in (s.get("values") or []):
+            if not isinstance(item, (list, tuple)) or len(item) < 2:
+                continue
+            ts, val = item[0], item[1]
             try:
-                ts = int(float(ts)); v = float(val)
+                ts_i = int(float(ts))
+                v = float(val)
+                if not math.isfinite(v):
+                    continue
             except Exception:
                 continue
-            acc[ts] = acc.get(ts, 0.0) + v
+            acc[ts_i] = acc.get(ts_i, 0.0) + v
     _dbg(debug, f"TS_MAP[{tag}]", {"points": len(acc)})
     return acc
+
 
 def _bin_setup(range_key: str, debug=False):
     now = int(time.time())
@@ -659,7 +754,6 @@ def _bin_setup(range_key: str, debug=False):
     return start, now, step_s, labels, ts_to_bin, bins
 
 def _prometheus_usage_series(source_key: str, range_key: str, spec: dict, debug=False):
-    """Compute kWh bins from Prometheus (CPU + dynamic RAM)."""
     label_val = PROJECT_TO_LABELVAL.get(source_key.lower())
     if not label_val:
         raise ValueError("Unknown source; expected clf|isis|diamond")
@@ -668,11 +762,41 @@ def _prometheus_usage_series(source_key: str, range_key: str, spec: dict, debug=
     start, end, step_s, labels, ts_to_bin, n_bins = _bin_setup(range_key, debug)
     step_str = f"{step_s}s"
 
-    # --- PromQLs
-    expr_util  = f'avg by (instance) (1 - rate(node_cpu_seconds_total{{mode="idle",cloud_project_name="{label_val}"}}[5m]))'
-    expr_cores = f'count(count by (instance, cpu) (node_cpu_seconds_total{{cloud_project_name="{label_val}"}})) by (instance)'
-    expr_cpu   = f'sum( ({expr_util}) * on(instance) group_left() ({expr_cores}) ) * {spec["cpu_tdp_w"]}'
-    _dbg(debug, "EXPR_CPU", expr_cpu)
+    rate_win = {"day": "5m", "month": "30m", "year": "1h"}[range_key]
+    _dbg(debug, "RATE_WIN", rate_win)
 
-    expr_ram   = f'sum( node_memory_Active_bytes{{cloud_project_name="{label_val}"}} / node_memory_MemTotal_bytes{{cloud_project_name="{label_val}"}} ) * {spec["ram_w"]}'
+    # --- CPU power (try rich expr, then fast fallback)
+    expr_util  = f'avg by (instance) (1 - rate(node_cpu_seconds_total{{mode="idle",cloud_project_name="{label_val}"}}[{rate_win}]))'
+    expr_cores = f'count(count by (instance, cpu) (node_cpu_seconds_total{{cloud_project_name="{label_val}"}})) by (instance)'
+    expr_cpu_rich = f'sum( ({expr_util}) * on(instance) group_left() ({expr_cores}) ) * {spec["cpu_tdp_w"]}'
+    _dbg(debug, "EXPR_CPU", expr_cpu_rich)
+
+    try:
+        cpu_mat = _prom_query_range(expr_cpu_rich, start, end, step_str, debug)
+    except Exception as e:
+        _dbg(debug, "CPU_EXPR_FALLBACK", repr(e))
+        # Cheaper: busy-cores = sum of non-idle CPU-seconds rate across all CPUs/instances
+        expr_cpu_fast = f'sum(rate(node_cpu_seconds_total{{mode!="idle",cloud_project_name="{label_val}"}}[{rate_win}])) * {spec["cpu_tdp_w"]}'
+        _dbg(debug, "EXPR_CPU_FAST", expr_cpu_fast)
+        cpu_mat = _prom_query_range(expr_cpu_fast, start, end, step_str, debug)
+
+    # --- RAM power (dynamic)
+    expr_ram = f'sum( node_memory_Active_bytes{{cloud_project_name="{label_val}"}} / node_memory_MemTotal_bytes{{cloud_project_name="{label_val}"}} ) * {spec["ram_w"]}'
     _dbg(debug, "EXPR_RAM", expr_ram)
+    ram_mat = _prom_query_range(expr_ram, start, end, step_str, debug)
+
+    # --- Map TS -> W and bin to kWh
+    cpu_ts = _ts_map_from_matrix(cpu_mat, debug, "CPU_W")
+    ram_ts = _ts_map_from_matrix(ram_mat, debug, "RAM_W")
+
+    kwh_bins = [0.0] * n_bins
+    all_ts = sorted(set(cpu_ts.keys()) | set(ram_ts.keys()))
+    for ts in all_ts:
+        watts = cpu_ts.get(ts, 0.0) + ram_ts.get(ts, 0.0)
+        idx = ts_to_bin(ts)
+        if 0 <= idx < n_bins:
+            kwh_bins[idx] += (watts / 1000.0) * (step_s / 3600.0)
+
+    _dbg(debug, "BINS_SAMPLE", {"first_5": [round(v, 3) for v in kwh_bins[:5]], "n_bins": n_bins})
+    _dbg(debug, "TOTAL_KWH", round(sum(kwh_bins), 3))
+    return labels, [round(v, 3) for v in kwh_bins]
