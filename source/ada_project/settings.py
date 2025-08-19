@@ -95,3 +95,6 @@ STATICFILES_DIRS = [BASE_DIR / 'main' / 'static']
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+PROMETHEUS_URL = 'https://host-172-16-100-248.nubes.stfc.ac.uk/'
