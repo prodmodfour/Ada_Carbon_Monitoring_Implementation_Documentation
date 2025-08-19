@@ -10,6 +10,14 @@ from urllib.parse import quote
 import math
 import requests
 
+# ========= DEBUG PRINT HELPER =========
+def _dbg(enabled, *args):
+    """Console prints only when enabled=True."""
+    if enabled:
+        print("[ENERGY DEBUG]", *args)
+# =====================================
+
+
 def _ws_key(source: str) -> str:
     # keep workspaces separate per source (isis, clf, ...)
     return f"workspaces::{source.lower()}"
@@ -334,33 +342,45 @@ def _make_series(range_key: str, spec: dict):
 
 def project_usage_api(request):
     """
-    Real project usage backed by Prometheus (CPU + dynamic RAM).
+    Real project usage backed by Prometheus (CPU + dynamic RAM) with debug prints.
     Query params:
       - range: day|month|year
       - source: clf|isis|diamond
-      - (optional) tdp_* overrides retained for testing
+      - debug: 1|true to print to console
+      - (optional) tdp_* overrides, e.g. ?cpu_tdp_w=10&ram_w=25
     """
+    debug = str(request.GET.get("debug", "")).lower() in ("1", "true", "yes", "on")
     range_key = request.GET.get("range", "day").lower()
-    if range_key not in ("day","month","year"):
-        return HttpResponseBadRequest("range must be day|month|year")
-    source = request.GET.get("source", "").lower()
+    source = (request.GET.get("source") or "").lower()
 
-    # Base TDP spec (per-core watts etc.) with optional overrides
+    _dbg(debug, "REQUEST", {"range": range_key, "source": source, "qs": dict(request.GET)})
+
+    if range_key not in ("day", "month", "year"):
+        return HttpResponseBadRequest("range must be day|month|year")
+
+    # TDP spec (allow overrides for testing)
     spec = DEFAULT_TDP_SPEC.copy()
     for key in ("cpu_count","cpu_tdp_w","gpu_count","gpu_tdp_w","ram_w","other_w"):
         if key in request.GET:
-            try: spec[key] = float(request.GET.get(key))
-            except Exception: pass
+            try:
+                val = float(request.GET.get(key))
+                spec[key] = val
+            except Exception:
+                pass
+    _dbg(debug, "SPEC", spec)
 
     try:
         if source in PROJECT_TO_LABELVAL:
-            labels, kwh = _prometheus_usage_series(source, range_key, spec)
+            labels, kwh = _prometheus_usage_series(source, range_key, spec, debug)
         else:
-            labels, kwh = _make_series(range_key, spec)  # fallback
-    except Exception:
-        labels, kwh = _make_series(range_key, spec)      # graceful degrade
+            _dbg(debug, "FALLBACK_MOCK_SERIES")
+            labels, kwh = _make_series(range_key, spec)
+    except Exception as e:
+        _dbg(debug, "ERROR", repr(e))
+        labels, kwh = _make_series(range_key, spec)
 
     total_kwh = round(sum(kwh), 3)
+    _dbg(debug, "RESPONSE", {"labels_len": len(labels), "kwh_len": len(kwh), "total_kwh": total_kwh})
     return JsonResponse({
         "range": range_key,
         "labels": labels,
@@ -368,6 +388,7 @@ def project_usage_api(request):
         "total_kwh": total_kwh,
         "spec": spec,
     })
+
 
 
 # ---- SCI Score dummy API ----------------------------------------------------
@@ -576,38 +597,45 @@ PROJECT_TO_LABELVAL = {
     "diamond": "DDAaaS",
 }
 
-def _prom_api_base() -> str:
+def _prom_api_base(debug=False):
     base = getattr(settings, "PROMETHEUS_URL", "").rstrip("/")
-    if not base:
-        raise RuntimeError("PROMETHEUS_URL not configured in settings.py")
-    return base + "/api/v1"
+    api = base + "/api/v1"
+    _dbg(debug, "PROM_BASE", api)
+    return api
 
-def _prom_query_range(expr: str, start: int, end: int, step: str):
-    url = _prom_api_base() + "/query_range"
-    r = requests.get(
-        url,
-        params={"query": expr, "start": start, "end": end, "step": step},  # <- comma here
-        timeout=30,
-        verify=False,  # self-signed is fine for now
-    )
-    r.raise_for_status()
-    return r.json()
+def _prom_query_range(expr: str, start: int, end: int, step: str, debug=False):
+    url = _prom_api_base(debug) + "/query_range"
+    _dbg(debug, "Q_RANGE", {"expr": expr, "start": start, "end": end, "step": step})
+    try:
+        r = requests.get(
+            url,
+            params={"query": expr, "start": start, "end": end, "step": step},
+            timeout=30,
+            verify=False,
+        )
+        r.raise_for_status()
+        out = r.json()
+        series = len(out.get("data", {}).get("result", []))
+        _dbg(debug, "Q_RANGE_OK", {"series": series, "status": out.get("status")})
+        return out
+    except Exception as e:
+        _dbg(debug, "Q_RANGE_ERR", repr(e))
+        raise
 
-def _ts_map_from_matrix(result_obj):
-    # Sum all returned series onto a single {timestamp -> value} map
+def _ts_map_from_matrix(result_obj, debug=False, tag=""):
     series = result_obj.get("data", {}).get("result", [])
     acc = {}
     for s in series:
         for ts, val in s.get("values", []):
             try:
-                ts = int(float(ts))
-                v = float(val)
+                ts = int(float(ts)); v = float(val)
             except Exception:
                 continue
             acc[ts] = acc.get(ts, 0.0) + v
+    _dbg(debug, f"TS_MAP[{tag}]", {"points": len(acc)})
     return acc
 
-def _bin_setup(range_key: str):
+def _bin_setup(range_key: str, debug=False):
     now = int(time.time())
     if range_key == "day":
         step_s = 3600; start = now - 24*3600
@@ -626,33 +654,25 @@ def _bin_setup(range_key: str):
         bins = 12
     else:
         raise ValueError("range must be day|month|year")
+
+    _dbg(debug, "BIN_SETUP", {"range": range_key, "start": start, "end": now, "step_s": step_s, "bins": bins})
     return start, now, step_s, labels, ts_to_bin, bins
 
-def _prometheus_usage_series(source_key: str, range_key: str, spec: dict):
+def _prometheus_usage_series(source_key: str, range_key: str, spec: dict, debug=False):
+    """Compute kWh bins from Prometheus (CPU + dynamic RAM)."""
     label_val = PROJECT_TO_LABELVAL.get(source_key.lower())
     if not label_val:
         raise ValueError("Unknown source; expected clf|isis|diamond")
+    _dbg(debug, "SOURCE", {"source": source_key, "label_val": label_val})
 
-    start, end, step_s, labels, ts_to_bin, n_bins = _bin_setup(range_key)
+    start, end, step_s, labels, ts_to_bin, n_bins = _bin_setup(range_key, debug)
     step_str = f"{step_s}s"
 
-    # CPU W = sum_over_instances( util * cores ) * CPU_TDP_PER_CORE
-    expr_util = f'avg by (instance) (1 - rate(node_cpu_seconds_total{{mode="idle",cloud_project_name="{label_val}"}}[5m]))'
+    # --- PromQLs
+    expr_util  = f'avg by (instance) (1 - rate(node_cpu_seconds_total{{mode="idle",cloud_project_name="{label_val}"}}[5m]))'
     expr_cores = f'count(count by (instance, cpu) (node_cpu_seconds_total{{cloud_project_name="{label_val}"}})) by (instance)'
-    expr_cpu  = f'sum( ({expr_util}) * on(instance) group_left() ({expr_cores}) ) * {spec["cpu_tdp_w"]}'
-    cpu_mat   = _prom_query_range(expr_cpu, start, end, step_str)
-    cpu_ts    = _ts_map_from_matrix(cpu_mat)
+    expr_cpu   = f'sum( ({expr_util}) * on(instance) group_left() ({expr_cores}) ) * {spec["cpu_tdp_w"]}'
+    _dbg(debug, "EXPR_CPU", expr_cpu)
 
-    # RAM W = sum_over_instances( Active/Total ) * RAM_W (dynamic)
-    expr_ram  = f'sum( node_memory_Active_bytes{{cloud_project_name="{label_val}"}} / node_memory_MemTotal_bytes{{cloud_project_name="{label_val}"}} ) * {spec["ram_w"]}'
-    ram_mat   = _prom_query_range(expr_ram, start, end, step_str)
-    ram_ts    = _ts_map_from_matrix(ram_mat)
-
-    # Combine and convert to kWh per bin (ignore GPUs for now; omit OTHER_W to avoid per-node ambiguity)
-    all_ts = sorted(set(cpu_ts) | set(ram_ts))
-    kwh_bins = [0.0] * n_bins
-    for ts in all_ts:
-        watts = cpu_ts.get(ts, 0.0) + ram_ts.get(ts, 0.0)
-        kwh_bins[ts_to_bin(ts)] += (watts / 1000.0) * (step_s / 3600.0)
-
-    return labels, [round(v, 3) for v in kwh_bins]
+    expr_ram   = f'sum( node_memory_Active_bytes{{cloud_project_name="{label_val}"}} / node_memory_MemTotal_bytes{{cloud_project_name="{label_val}"}} ) * {spec["ram_w"]}'
+    _dbg(debug, "EXPR_RAM", expr_ram)
