@@ -2,11 +2,13 @@ import random, math, datetime as dt
 
 import uuid
 import urllib.request, json
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 from django.http import HttpRequest, HttpResponse, JsonResponse, HttpResponseBadRequest
 from django.shortcuts import render, redirect
 from django.utils import timezone
 from urllib.parse import quote
+import math
+import requests
 
 def _ws_key(source: str) -> str:
     # keep workspaces separate per source (isis, clf, ...)
@@ -332,37 +334,41 @@ def _make_series(range_key: str, spec: dict):
 
 def project_usage_api(request):
     """
-    Returns estimated electricity usage for a project.
+    Real project usage backed by Prometheus (CPU + dynamic RAM).
     Query params:
-      - range: day | month | year
-      - view: elec | carbon   (client uses for display; server returns elec kWh)
-      - (optional) tdp_* to override default spec, e.g. ?cpu_count=16&gpu_count=2...
-    Replace internals with DB lookups later.
+      - range: day|month|year
+      - source: clf|isis|diamond
+      - (optional) tdp_* overrides retained for testing
     """
     range_key = request.GET.get("range", "day").lower()
-    if range_key not in ("day", "month", "year"):
+    if range_key not in ("day","month","year"):
         return HttpResponseBadRequest("range must be day|month|year")
+    source = request.GET.get("source", "").lower()
 
-    # Allow overrides via query string for quick testing
+    # Base TDP spec (per-core watts etc.) with optional overrides
     spec = DEFAULT_TDP_SPEC.copy()
     for key in ("cpu_count","cpu_tdp_w","gpu_count","gpu_tdp_w","ram_w","other_w"):
         if key in request.GET:
-            try:
-                spec[key] = float(request.GET[key]) if key.endswith("_w") else int(request.GET[key])
-            except ValueError:
-                pass
+            try: spec[key] = float(request.GET.get(key))
+            except Exception: pass
 
-    labels, kwh = _make_series(range_key, spec)
+    try:
+        if source in PROJECT_TO_LABELVAL:
+            labels, kwh = _prometheus_usage_series(source, range_key, spec)
+        else:
+            labels, kwh = _make_series(range_key, spec)  # fallback
+    except Exception:
+        labels, kwh = _make_series(range_key, spec)      # graceful degrade
+
     total_kwh = round(sum(kwh), 3)
-
     return JsonResponse({
         "range": range_key,
         "labels": labels,
         "kwh": kwh,
         "total_kwh": total_kwh,
         "spec": spec,
-        # Note: client will convert to CO2e using CI factors (can also be server-side later)
     })
+
 
 # ---- SCI Score dummy API ----------------------------------------------------
 # If DEFAULT_TDP_SPEC already exists (from project usage API), we reuse it.
@@ -559,3 +565,94 @@ def _estimate_ws_metrics(ws: dict, ci_gpkwh: float = 220.0) -> dict:
         "total_kg": total_kg,   "idle_kg": idle_kg,
         "idle_w": idle_w, "ci": ci_gpkwh
     }
+
+
+# ---- Prometheus-backed energy (CPU + dynamic RAM) ----
+
+
+PROJECT_TO_LABELVAL = {
+    "clf": "CDAaaS",
+    "isis": "IDAaaS",
+    "diamond": "DDAaaS",
+}
+
+def _prom_api_base() -> str:
+    base = getattr(settings, "PROMETHEUS_URL", "").rstrip("/")
+    if not base:
+        raise RuntimeError("PROMETHEUS_URL not configured in settings.py")
+    return base + "/api/v1"
+
+def _prom_query_range(expr: str, start: int, end: int, step: str):
+    url = _prom_api_base() + "/query_range"
+    r = requests.get(
+        url,
+        params={"query": expr, "start": start, "end": end, "step": step},  # <- comma here
+        timeout=30,
+        verify=False,  # self-signed is fine for now
+    )
+    r.raise_for_status()
+    return r.json()
+
+def _ts_map_from_matrix(result_obj):
+    # Sum all returned series onto a single {timestamp -> value} map
+    series = result_obj.get("data", {}).get("result", [])
+    acc = {}
+    for s in series:
+        for ts, val in s.get("values", []):
+            try:
+                ts = int(float(ts))
+                v = float(val)
+            except Exception:
+                continue
+            acc[ts] = acc.get(ts, 0.0) + v
+    return acc
+
+def _bin_setup(range_key: str):
+    now = int(time.time())
+    if range_key == "day":
+        step_s = 3600; start = now - 24*3600
+        labels = [f"{h:02d}:00" for h in range(24)]
+        def ts_to_bin(ts): return max(0, min(23, int((ts - start) // 3600)))
+        bins = 24
+    elif range_key == "month":
+        step_s = 86400; start = now - 30*86400
+        labels = [f"D{d}" for d in range(1,31)]
+        def ts_to_bin(ts): return max(0, min(29, int((ts - start) // 86400)))
+        bins = 30
+    elif range_key == "year":
+        step_s = 86400; start = now - 365*86400
+        labels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+        def ts_to_bin(ts): return datetime.fromtimestamp(ts, tz=timezone.utc).month - 1
+        bins = 12
+    else:
+        raise ValueError("range must be day|month|year")
+    return start, now, step_s, labels, ts_to_bin, bins
+
+def _prometheus_usage_series(source_key: str, range_key: str, spec: dict):
+    label_val = PROJECT_TO_LABELVAL.get(source_key.lower())
+    if not label_val:
+        raise ValueError("Unknown source; expected clf|isis|diamond")
+
+    start, end, step_s, labels, ts_to_bin, n_bins = _bin_setup(range_key)
+    step_str = f"{step_s}s"
+
+    # CPU W = sum_over_instances( util * cores ) * CPU_TDP_PER_CORE
+    expr_util = f'avg by (instance) (1 - rate(node_cpu_seconds_total{{mode="idle",cloud_project_name="{label_val}"}}[5m]))'
+    expr_cores = f'count(count by (instance, cpu) (node_cpu_seconds_total{{cloud_project_name="{label_val}"}})) by (instance)'
+    expr_cpu  = f'sum( ({expr_util}) * on(instance) group_left() ({expr_cores}) ) * {spec["cpu_tdp_w"]}'
+    cpu_mat   = _prom_query_range(expr_cpu, start, end, step_str)
+    cpu_ts    = _ts_map_from_matrix(cpu_mat)
+
+    # RAM W = sum_over_instances( Active/Total ) * RAM_W (dynamic)
+    expr_ram  = f'sum( node_memory_Active_bytes{{cloud_project_name="{label_val}"}} / node_memory_MemTotal_bytes{{cloud_project_name="{label_val}"}} ) * {spec["ram_w"]}'
+    ram_mat   = _prom_query_range(expr_ram, start, end, step_str)
+    ram_ts    = _ts_map_from_matrix(ram_mat)
+
+    # Combine and convert to kWh per bin (ignore GPUs for now; omit OTHER_W to avoid per-node ambiguity)
+    all_ts = sorted(set(cpu_ts) | set(ram_ts))
+    kwh_bins = [0.0] * n_bins
+    for ts in all_ts:
+        watts = cpu_ts.get(ts, 0.0) + ram_ts.get(ts, 0.0)
+        kwh_bins[ts_to_bin(ts)] += (watts / 1000.0) * (step_s / 3600.0)
+
+    return labels, [round(v, 3) for v in kwh_bins]

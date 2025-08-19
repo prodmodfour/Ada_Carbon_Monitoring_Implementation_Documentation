@@ -615,7 +615,7 @@ data-ci="{{ ws.ci|default:220 }}">
   }
 
   async function fetchUsage(range){
-    const url = `/api/project-usage?range=${encodeURIComponent(range)}`;
+    const url = `/api/project-usage?range=${encodeURIComponent(range)}&source={{ source }}`;
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
