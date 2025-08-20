@@ -592,8 +592,12 @@ data-ci="{{ ws.ci|default:220 }}">
   const TREE_KG_PER_YEAR     = 21;
   const PARIS_DUBAI_KG       = 1000;
 
+  const SOURCE = "{{ source }}";
+  const dataCache = new Map();                    // key = `${SOURCE}:${range}`
   let currentView = 'elec';
   let currentRange = 'day';
+  let isLoading = false;
+  let last = { labels: [], kwh: [], total_kwh: 0 };
   let chart;
 
   const elChart = $('#usageChart').getContext('2d');
@@ -614,21 +618,35 @@ data-ci="{{ ws.ci|default:220 }}">
     btn.classList.add('active'); btn.setAttribute('aria-pressed','true');
   }
 
-  async function fetchUsage(range){
-    const url = `/api/project-usage?range=${encodeURIComponent(range)}&source={{ source }}`
+  async function fetchUsage(range, { refresh = false } = {}){
+    const key = `${SOURCE}:${range}`;
+    if (!refresh && dataCache.has(key)) return dataCache.get(key);
+
+    const url = `/api/project-usage?range=${encodeURIComponent(range)}&source=${SOURCE}`;
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
+    const json = await res.json();
+    dataCache.set(key, json);
+    return json;
   }
 
-  function renderChart(labels, series, unitLabel){
+  function renderChart(labels, series, view){
+    const yTitle = view === 'elec' ? 'Energy (kWh)' : 'Emissions (kg CO₂e)';
+    const unitForTooltip = view === 'elec' ? 'kWh' : 'kg CO₂e';
     const data = { labels, datasets: [{ data: series, borderWidth: 0, backgroundColor: 'rgba(66,133,244,0.7)' }] };
     const options = {
       responsive: true, maintainAspectRatio: false, resizeDelay: 150,
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${fmt(ctx.parsed.y, 2)} ${unitLabel}` } } },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `${fmt(ctx.parsed.y, 2)} ${unitForTooltip}` } }
+      },
       scales: {
         x: { grid: { display: false } },
-        y: { grid: { color: '#eee' }, ticks: { callback: (v) => v } }
+        y: {
+          grid: { color: '#eee' },
+          title: { display: true, text: yTitle },   // explicit units on axis
+          ticks: { callback: (v) => v }
+        }
       }
     };
     if (chart) { chart.data = data; chart.options = options; chart.update(); }
@@ -685,42 +703,66 @@ data-ci="{{ ws.ci|default:220 }}">
   elUsageHelpBtn.addEventListener('click', () => usageHelpOpen ? closeUsageHelp() : openUsageHelp());
   elUsageHelpClose.addEventListener('click', closeUsageHelp);
 
-  let last = { labels: [], kwh: [], total_kwh: 0 };
-
-  async function load(range=currentRange, view=currentView){
+  async function load(range = currentRange){
+    if (isLoading) return;
+    isLoading = true;
     try{
       elErr.classList.add('hidden');
+
+      // Only fetch when the range changes or not cached yet
       const data = await fetchUsage(range);
       last = data;
 
-      let ci = CI_G_PER_KWH_DEFAULT;
-      if (view === 'carbon' && range === 'day') {
-        // could replace with aggregated CI from your proxy later
-      }
-
-      const unit = (view === 'elec') ? 'kWh' : 'kg CO₂e';
-      const series = (view === 'elec')
+      const ci = CI_G_PER_KWH_DEFAULT;
+      const series = (currentView === 'elec')
         ? data.kwh
         : data.kwh.map(v => v * (ci/1000));
 
-      renderChart(data.labels, series, unit);
+      renderChart(data.labels, series, currentView);
 
-      if (view === 'elec') renderMetricsElec(data.total_kwh);
+      if (currentView === 'elec') renderMetricsElec(data.total_kwh);
       else renderMetricsCarbon(data.total_kwh, ci);
 
+      elNote.textContent = '';
     }catch(err){
       elErrMsg.textContent = `Unable to load usage (${err.message}).`;
       elErr.classList.remove('hidden');
+    } finally {
+      isLoading = false;
     }
   }
 
+  // Re-render immediately on view change (no fetch); fetch on range change.
   document.querySelector('.usage-controls').addEventListener('click', (e) => {
     const btn = e.target.closest('.seg-btn'); if (!btn) return;
-    if (btn.dataset.view){ currentView = btn.dataset.view; setSegActive('.usage-controls', btn); load(); }
-    if (btn.dataset.range){ currentRange = btn.dataset.range; setSegActive('.usage-controls', btn); load(); }
+
+    if (btn.dataset.view){
+      currentView = btn.dataset.view;
+      setSegActive('.usage-controls', btn);
+
+      if (!last || !last.labels || last.labels.length === 0) {
+        load();  // if nothing cached yet
+      } else {
+        const ci = CI_G_PER_KWH_DEFAULT;
+        const series = (currentView === 'elec')
+          ? last.kwh
+          : last.kwh.map(v => v * (ci/1000));
+        renderChart(last.labels, series, currentView);
+        if (currentView === 'elec') renderMetricsElec(last.total_kwh);
+        else renderMetricsCarbon(last.total_kwh, ci);
+      }
+    }
+
+    if (btn.dataset.range){
+      currentRange = btn.dataset.range;
+      setSegActive('.usage-controls', btn);
+      load(); // fetch only when range changes
+    }
   });
+
   $('#usageRetry').addEventListener('click', () => load());
 
+  // initial load
   load();
 })();
   </script>
