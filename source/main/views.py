@@ -385,56 +385,99 @@ def _make_series(range_key: str, spec: dict):
 
 def project_usage_api(request):
     """
-    Uses DB cache first; recomputes (Prometheus or mock) when stale or forced.
+    Return energy series for the project cards.
+
+    Modes (settings.PROM_DATA_MODE):
+      - "db_only": never query Prometheus here; serve cached DB rows only.
+                   If not cached -> 503 with an instruction to prefetch.
+      - "prom_on_miss" (default): use DB if fresh; otherwise compute and cache.
+
     Query params:
       - range: day|month|year
-      - source: clf|isis|diamond
-      - debug: 1|true -> console prints
-      - force_refresh: 1|true -> bypass cache
-      - (optional) tdp_* overrides kept for testing
+      - source: clf|isis|diamond   (others fall back to mock series, no DB)
+      - debug: 1|true
+      - force_refresh: 1|true      (ignored in db_only mode)
+      - Optional overrides for testing:
+          cpu_count, cpu_tdp_w, gpu_count, gpu_tdp_w, ram_w, other_w
     """
+    # --- inputs ---
+    mode = getattr(settings, "PROM_DATA_MODE", "prom_on_miss")
     debug = str(request.GET.get("debug", "")).lower() in ("1", "true", "yes", "on")
     range_key = (request.GET.get("range") or "day").lower()
     source = (request.GET.get("source") or "").lower()
     force_refresh = str(request.GET.get("force_refresh", "")).lower() in ("1", "true", "yes", "on")
 
-    _dbg(debug, "REQUEST", {"range": range_key, "source": source, "qs": dict(request.GET)})
+    _dbg(debug, "REQUEST", {"mode": mode, "range": range_key, "source": source, "qs": dict(request.GET)})
 
     if range_key not in ("day", "month", "year"):
         return HttpResponseBadRequest("range must be day|month|year")
 
-    # TDP spec (allow overrides)
+    # --- build spec (with optional overrides) + hash ---
     spec = DEFAULT_TDP_SPEC.copy()
-    for key in ("cpu_count","cpu_tdp_w","gpu_count","gpu_tdp_w","ram_w","other_w"):
+    for key in ("cpu_count", "cpu_tdp_w", "gpu_count", "gpu_tdp_w", "ram_w", "other_w"):
         if key in request.GET:
             try:
-                val = float(request.GET.get(key))
-                spec[key] = val
+                spec[key] = float(request.GET.get(key))
             except Exception:
                 pass
     shash = _spec_hash(spec)
     _dbg(debug, "SPEC", {**spec, "_hash": shash})
 
-    # 1) Try cache
+    # --- DB lookup ---
     ttl = _cache_ttl_seconds(range_key)
-    if source in ("clf", "isis", "diamond") and not force_refresh:
-        qs = ProjectEnergy.objects.filter(source=source, range_key=range_key, spec_hash=shash).order_by("-updated_at")
-        row = qs.first()
-        if row:
-            age = (tz_now() - row.updated_at).total_seconds()
-            _dbg(debug, "CACHE_HIT", {"id": row.id, "age_s": int(age), "ttl_s": ttl})
-            if age < ttl:
-                data = {
-                    "range": range_key,
-                    "labels": row.labels,
-                    "kwh": row.kwh,
-                    "total_kwh": row.total_kwh,
-                    "spec": spec,
-                }
-                _dbg(debug, "RESPONSE(DB)", {"labels_len": len(row.labels), "kwh_len": len(row.kwh), "total_kwh": row.total_kwh})
-                return JsonResponse(data)
+    can_cache = source in ("clf", "isis", "diamond")
 
-    # 2) Compute (Prometheus for known sources; mock otherwise)
+    if can_cache:
+        qs = ProjectEnergy.objects.filter(
+            source=source, range_key=range_key, spec_hash=shash
+        ).order_by("-updated_at")
+        row = qs.first()
+    else:
+        row = None
+
+    # In db_only mode: always serve cached data (ignore TTL/force_refresh)
+    if mode == "db_only":
+        if row:
+            data = {
+                "range": range_key,
+                "labels": row.labels,
+                "kwh": row.kwh,
+                "total_kwh": row.total_kwh,
+                "spec": spec,
+            }
+            _dbg(debug, "RESPONSE(DB_ONLY)", {
+                "id": row.id, "labels_len": len(row.labels), "kwh_len": len(row.kwh),
+                "total_kwh": row.total_kwh
+            })
+            return JsonResponse(data)
+        # No cached row -> instruct operator to prefetch and return 503
+        msg = (
+            "No cached PromQL data for this (source, range, spec). "
+            "Warm the cache first, e.g.:\n"
+            "  python manage.py refresh_energy_cache --sources clf,isis,diamond --ranges day,month,year"
+        )
+        _dbg(debug, "DB_ONLY_MISS", msg)
+        return JsonResponse({"error": msg}, status=503)
+
+    # Not db_only: use cache if fresh and not force_refresh
+    if row and not force_refresh:
+        age_s = (tz_now() - row.updated_at).total_seconds()
+        _dbg(debug, "CACHE_HIT", {"id": row.id, "age_s": int(age_s), "ttl_s": ttl})
+        if age_s < ttl:
+            data = {
+                "range": range_key,
+                "labels": row.labels,
+                "kwh": row.kwh,
+                "total_kwh": row.total_kwh,
+                "spec": spec,
+            }
+            _dbg(debug, "RESPONSE(DB)", {
+                "labels_len": len(row.labels), "kwh_len": len(row.kwh),
+                "total_kwh": row.total_kwh
+            })
+            return JsonResponse(data)
+
+    # --- compute path (only in prom_on_miss mode) ---
     try:
         if source in PROJECT_TO_LABELVAL:
             labels, kwh = _prometheus_usage_series(source, range_key, spec, debug)
@@ -442,13 +485,13 @@ def project_usage_api(request):
             _dbg(debug, "FALLBACK_MOCK_SERIES")
             labels, kwh = _make_series(range_key, spec)
     except Exception as e:
-        _dbg(debug, "ERROR", repr(e))
+        _dbg(debug, "COMPUTE_ERROR", repr(e))
         labels, kwh = _make_series(range_key, spec)
 
     total_kwh = round(sum(kwh), 3)
 
-    # 3) Save to DB (best effort; don’t fail the request if DB save fails)
-    if source in ("clf", "isis", "diamond"):
+    # Save to DB best-effort for known sources
+    if can_cache:
         try:
             s, e, step_s = _bin_meta(range_key)
             row = ProjectEnergy.objects.create(
@@ -467,7 +510,9 @@ def project_usage_api(request):
         except Exception as db_e:
             _dbg(debug, "CACHE_SAVE_ERR", repr(db_e))
 
-    _dbg(debug, "RESPONSE", {"labels_len": len(labels), "kwh_len": len(kwh), "total_kwh": total_kwh})
+    _dbg(debug, "RESPONSE(COMPUTED)", {
+        "labels_len": len(labels), "kwh_len": len(kwh), "total_kwh": total_kwh
+    })
     return JsonResponse({
         "range": range_key,
         "labels": labels,

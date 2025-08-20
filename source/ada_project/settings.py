@@ -98,3 +98,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 PROMETHEUS_URL = 'https://host-172-16-100-248.nubes.stfc.ac.uk/'
+
+# PromQL fetch policy for /api/project-usage:
+#   "db_only"       -> never hit Prometheus from views; DB or 503
+#   "prom_on_miss"  -> current behavior (fetch Prom if DB missing/stale)
+PROM_DATA_MODE = "db_only"
