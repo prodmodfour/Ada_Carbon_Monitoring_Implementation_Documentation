@@ -96,7 +96,6 @@ class ProjectEnergyAdmin(admin.ModelAdmin):
 
     export_as_json.short_description = "Export selected rows as JSON"
 
-# Optional: simple branding
 admin.site.site_header = "Mock ADA — Energy Cache"
 admin.site.site_title = "Mock ADA Admin"
 admin.site.index_title = "Administration"
