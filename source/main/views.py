@@ -34,8 +34,10 @@ def _dbg(enabled: bool, *args) -> None:
 # =====================================
 
 # -----------------------------
-# Constants (single source of truth)
+# Constants 
 # -----------------------------
+
+PROM_HTTP_TIMEOUT = (10, 600)  # (connect, read) seconds — generous for month/year windows
 DEFAULT_TDP_SPEC = {
     "cpu_count": 12,    # logical or physical; up to you
     "cpu_tdp_w": 12,    # per-core watts under typical load (not peak)
