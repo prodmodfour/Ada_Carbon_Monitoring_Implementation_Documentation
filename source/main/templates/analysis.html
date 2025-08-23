@@ -336,12 +336,22 @@ data-ci="{{ ws.ci|default:220 }}">
   const elCustomWrap = $('#ciCustom');
   const elFrom = $('#ciFrom');
   const elTo = $('#ciTo');
+  const elControls = document.querySelector('.ci-controls');
   const elHelpBtn   = document.getElementById('ciHelpBtn');
   const elHelp      = document.getElementById('ciHelp');
   const elHelpClose = document.getElementById('ciHelpClose');
   let helpOpen = false;
   let helpOutsideListener = null;
   let helpEscListener = null;
+
+  // Guard: must have canvas + Chart.js
+  if (!elChart || typeof Chart === 'undefined') {
+    if (elError && elErrMsg) {
+      elErrMsg.textContent = 'Chart library not available.';
+      elError.classList.remove('hidden');
+    }
+    return;
+  }
 
   // ===== Chart state =====
   let chart;
@@ -430,7 +440,7 @@ data-ci="{{ ws.ci|default:220 }}">
     if (capped) {
       parts.push(`Note: Range capped to 48 hours; forecasting beyond 48h is less accurate.`);
     }
-    elNote.textContent = parts.join(' · ');
+    if (elNote) elNote.textContent = parts.join(' · ');
   }
 
   function buildLabels(items) {
@@ -453,8 +463,8 @@ data-ci="{{ ws.ci|default:220 }}">
     const { from, to, capped } = clamp48 ? cap48(fromLocal, toLocal) : { from: fromLocal, to: toLocal, capped: false };
     const url = buildUrl(from, to);
 
-    elError.classList.add('hidden');
-    elNote.textContent = 'Loading forecast…';
+    if (elError) elError.classList.add('hidden');
+    if (elNote) elNote.textContent = 'Loading forecast…';
 
     try {
       const res = await fetch(url, { cache: 'no-store' });
@@ -474,20 +484,26 @@ data-ci="{{ ws.ci|default:220 }}">
 
       renderChart();
       setNote(from, to, capped, best, state.labels);
-      elRefreshed.textContent = `· refreshed ${new Date().toLocaleTimeString()}`;
+      if (elRefreshed) elRefreshed.textContent = `· refreshed ${new Date().toLocaleTimeString()}`;
     } catch (err) {
-      elErrMsg.textContent = `Unable to load forecast (${err.message}).`;
-      elError.classList.remove('hidden');
-      elNote.textContent = '';
+      if (elErrMsg) elErrMsg.textContent = `Unable to load forecast (${err.message}).`;
+      if (elError) elError.classList.remove('hidden');
+      if (elNote) elNote.textContent = '';
     }
   }
 
   function setActive(btn) {
-    $$('.ci-controls .pill').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed','false'); });
+    if (!btn) return;
+    // scope to the clicked group only
+    const group = btn.closest('.ci-controls') || btn.parentElement;
+    if (!group) return;
+    const pills = Array.from(group.querySelectorAll('.pill'));
+    pills.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed','false'); });
     btn.classList.add('active');
     btn.setAttribute('aria-pressed','true');
   }
   function initCustomInputs(defaultFrom, defaultTo) {
+    if (!elFrom || !elTo) return;
     const toLocalInput = (d) => {
       const pad = (n) => String(n).padStart(2,'0');
       const dt = new Date(d);
@@ -499,65 +515,78 @@ data-ci="{{ ws.ci|default:220 }}">
 
   function selectWorkingDay() {
     const { from, to } = workingDayWindow(new Date());
-    setActive($('[data-range="working"]'));
-    elCustomWrap.classList.add('hidden'); elCustomWrap.setAttribute('aria-hidden','true');
+    const btn = document.querySelector('[data-range="working"]');
+    setActive(btn);
+    if (elCustomWrap) { elCustomWrap.classList.add('hidden'); elCustomWrap.setAttribute('aria-hidden','true'); }
     loadRange(from, to, { clamp48: true });
   }
   function select24h() {
     const start = nextHalfHour(new Date());
     const end = new Date(start.getTime() + 24*60*60*1000);
-    setActive($('[data-range="24h"]'));
-    elCustomWrap.classList.add('hidden'); elCustomWrap.setAttribute('aria-hidden','true');
+    const btn = document.querySelector('[data-range="24h"]');
+    setActive(btn);
+    if (elCustomWrap) { elCustomWrap.classList.add('hidden'); elCustomWrap.setAttribute('aria-hidden','true'); }
     loadRange(start, end, { clamp48: true });
   }
   function select48h() {
     const start = nextHalfHour(new Date());
     const end = new Date(start.getTime() + 48*60*60*1000);
-    setActive($('[data-range="48h"]'));
-    elCustomWrap.classList.add('hidden'); elCustomWrap.setAttribute('aria-hidden','true');
+    const btn = document.querySelector('[data-range="48h"]');
+    setActive(btn);
+    if (elCustomWrap) { elCustomWrap.classList.add('hidden'); elCustomWrap.setAttribute('aria-hidden','true'); }
     loadRange(start, end, { clamp48: true });
   }
   function selectCustom() {
     const start = nextHalfHour(new Date());
     const end = new Date(start.getTime() + 6*60*60*1000);
-    setActive($('[data-range="custom"]'));
-    elCustomWrap.classList.remove('hidden'); elCustomWrap.setAttribute('aria-hidden','false');
+    const btn = document.querySelector('[data-range="custom"]');
+    setActive(btn);
+    if (elCustomWrap) { elCustomWrap.classList.remove('hidden'); elCustomWrap.setAttribute('aria-hidden','false'); }
     initCustomInputs(start, end);
   }
 
-  $('.ci-controls').addEventListener('click', (e) => {
-    const btn = e.target.closest('.pill');
-    if (!btn) return;
-    const r = btn.dataset.range;
-    if (r === 'working') return selectWorkingDay();
-    if (r === '24h')     return select24h();
-    if (r === '48h')     return select48h();
-    if (r === 'custom')  return selectCustom();
-  });
+  if (elControls) {
+    elControls.addEventListener('click', (e) => {
+      const btn = e.target.closest('.pill');
+      if (!btn) return;
+      const r = btn.dataset.range;
+      if (r === 'working') return selectWorkingDay();
+      if (r === '24h')     return select24h();
+      if (r === '48h')     return select48h();
+      if (r === 'custom')  return selectCustom();
+    });
+  }
 
-  $('#ciApply').addEventListener('click', () => {
-    const from = new Date($('#ciFrom').value);
-    const to = new Date($('#ciTo').value);
-    if (isNaN(from.getTime()) || isNaN(to.getTime()) || to <= from) {
-      elErrMsg.textContent = 'Please provide a valid custom range (To must be after From).';
-      elError.classList.remove('hidden');
-      return;
-    }
-    loadRange(from, to, { clamp48: true });
-  });
+  const btnApply = $('#ciApply');
+  if (btnApply) {
+    btnApply.addEventListener('click', () => {
+      if (!elFrom || !elTo) return;
+      const from = new Date(elFrom.value);
+      const to = new Date(elTo.value);
+      if (isNaN(from.getTime()) || isNaN(to.getTime()) || to <= from) {
+        if (elErrMsg) elErrMsg.textContent = 'Please provide a valid custom range (To must be after From).';
+        if (elError) elError.classList.remove('hidden');
+        return;
+      }
+      loadRange(from, to, { clamp48: true });
+    });
+  }
 
-  $('#ciRetry').addEventListener('click', () => {
-    const active = document.querySelector('.ci-controls .pill.active');
-    if (!active) return selectWorkingDay();
-    const r = active.dataset.range;
-    if (r === 'working') return selectWorkingDay();
-    if (r === '24h')     return select24h();
-    if (r === '48h')     return select48h();
-    if (r === 'custom')  return $('#ciApply').click();
-  });
+  const btnRetry = $('#ciRetry');
+  if (btnRetry) {
+    btnRetry.addEventListener('click', () => {
+      const active = document.querySelector('.ci-controls .pill.active');
+      if (!active) return selectWorkingDay();
+      const r = active.dataset.range;
+      if (r === 'working') return selectWorkingDay();
+      if (r === '24h')     return select24h();
+      if (r === '48h')     return select48h();
+      if (r === 'custom')  return (btnApply && btnApply.click());
+    });
+  }
 
   function openHelp(){
-    if (helpOpen) return;
+    if (helpOpen || !elHelp || !elHelpBtn) return;
     elHelp.classList.remove('hidden');
     elHelpBtn.setAttribute('aria-expanded', 'true');
     helpOpen = true;
@@ -567,15 +596,17 @@ data-ci="{{ ws.ci|default:220 }}">
     document.addEventListener('keydown', helpEscListener);
   }
   function closeHelp(){
-    if (!helpOpen) return;
+    if (!helpOpen || !elHelp || !elHelpBtn) return;
     elHelp.classList.add('hidden');
     elHelpBtn.setAttribute('aria-expanded', 'false');
     helpOpen = false;
     document.removeEventListener('mousedown', helpOutsideListener);
     document.removeEventListener('keydown', helpEscListener);
   }
-  elHelpBtn.addEventListener('click', () => { helpOpen ? closeHelp() : openHelp(); });
-  elHelpClose.addEventListener('click', closeHelp);
+  if (elHelpBtn && elHelp && elHelpClose) {
+    elHelpBtn.addEventListener('click', () => { helpOpen ? closeHelp() : openHelp(); });
+    elHelpClose.addEventListener('click', closeHelp);
+  }
 
   selectWorkingDay();
 })();
@@ -600,7 +631,10 @@ data-ci="{{ ws.ci|default:220 }}">
   let last = { labels: [], kwh: [], total_kwh: 0 };
   let chart;
 
-  const elChart = $('#usageChart').getContext('2d');
+  const canvas = document.getElementById('usageChart');
+  if (!canvas || typeof Chart === 'undefined') return; // guard
+  const elChart = canvas.getContext('2d');
+
   const elMetrics = $('#metricList');
   const elTotals  = $('#metricTotals');
   const elTitle   = $('#metricTitle');
@@ -610,11 +644,17 @@ data-ci="{{ ws.ci|default:220 }}">
   const elUsageHelpBtn   = document.getElementById('usageHelpBtn');
   const elUsageHelp      = document.getElementById('usageHelp');
   const elUsageHelpClose = document.getElementById('usageHelpClose');
+  const elControls = document.querySelector('.usage-controls');
   let usageHelpOpen = false, usageOutside = null, usageEsc = null;
 
   function fmt(n, digits=0) { return Number(n).toLocaleString(undefined, { maximumFractionDigits: digits }); }
-  function setSegActive(groupSel, btn){
-    $$(groupSel + ' .seg-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed','false'); });
+
+  // Scope the "active" toggle to the clicked segment group only
+  function setSegActive(btn){
+    if (!btn) return;
+    const group = btn.closest('.seg');
+    if (!group) return;
+    group.querySelectorAll('.seg-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed','false'); });
     btn.classList.add('active'); btn.setAttribute('aria-pressed','true');
   }
 
@@ -644,7 +684,7 @@ data-ci="{{ ws.ci|default:220 }}">
         x: { grid: { display: false } },
         y: {
           grid: { color: '#eee' },
-          title: { display: true, text: yTitle },   // explicit units on axis
+          title: { display: true, text: yTitle },
           ticks: { callback: (v) => v }
         }
       }
@@ -654,6 +694,7 @@ data-ci="{{ ws.ci|default:220 }}">
   }
 
   function renderMetricsElec(totalKWh){
+    if (!elTitle || !elMetrics || !elTotals) return;
     elTitle.textContent = 'Electricity equivalency';
     elMetrics.innerHTML = `
       <li><strong>${fmt(totalKWh,2)} kWh</strong> total</li>
@@ -667,6 +708,7 @@ data-ci="{{ ws.ci|default:220 }}">
   }
 
   function renderMetricsCarbon(totalKWh, gPerKWh){
+    if (!elTitle || !elMetrics || !elTotals) return;
     const kg = totalKWh * (gPerKWh / 1000);
     elTitle.textContent = 'Carbon equivalency';
     elMetrics.innerHTML = `
@@ -682,7 +724,7 @@ data-ci="{{ ws.ci|default:220 }}">
   }
 
   function openUsageHelp(){
-    if (usageHelpOpen) return;
+    if (usageHelpOpen || !elUsageHelp || !elUsageHelpBtn) return;
     elUsageHelp.classList.remove('hidden');
     elUsageHelpBtn.setAttribute('aria-expanded','true');
     usageHelpOpen = true;
@@ -693,21 +735,23 @@ data-ci="{{ ws.ci|default:220 }}">
     document.addEventListener('keydown', usageEsc);
   }
   function closeUsageHelp(){
-    if (!usageHelpOpen) return;
+    if (!usageHelpOpen || !elUsageHelp || !elUsageHelpBtn) return;
     elUsageHelp.classList.add('hidden');
     elUsageHelpBtn.setAttribute('aria-expanded','false');
     usageHelpOpen = false;
     document.removeEventListener('mousedown', usageOutside);
     document.removeEventListener('keydown', usageEsc);
   }
-  elUsageHelpBtn.addEventListener('click', () => usageHelpOpen ? closeUsageHelp() : openUsageHelp());
-  elUsageHelpClose.addEventListener('click', closeUsageHelp);
+  if (elUsageHelpBtn && elUsageHelp && elUsageHelpClose) {
+    elUsageHelpBtn.addEventListener('click', () => usageHelpOpen ? closeUsageHelp() : openUsageHelp());
+    elUsageHelpClose.addEventListener('click', closeUsageHelp);
+  }
 
   async function load(range = currentRange){
     if (isLoading) return;
     isLoading = true;
     try{
-      elErr.classList.add('hidden');
+      if (elErr) elErr.classList.add('hidden');
 
       // Only fetch when the range changes or not cached yet
       const data = await fetchUsage(range);
@@ -723,44 +767,47 @@ data-ci="{{ ws.ci|default:220 }}">
       if (currentView === 'elec') renderMetricsElec(data.total_kwh);
       else renderMetricsCarbon(data.total_kwh, ci);
 
-      elNote.textContent = '';
+      if (elNote) elNote.textContent = '';
     }catch(err){
-      elErrMsg.textContent = `Unable to load usage (${err.message}).`;
-      elErr.classList.remove('hidden');
+      if (elErrMsg) elErrMsg.textContent = `Unable to load usage (${err.message}).`;
+      if (elErr) elErr.classList.remove('hidden');
     } finally {
       isLoading = false;
     }
   }
 
   // Re-render immediately on view change (no fetch); fetch on range change.
-  document.querySelector('.usage-controls').addEventListener('click', (e) => {
-    const btn = e.target.closest('.seg-btn'); if (!btn) return;
+  if (elControls) {
+    elControls.addEventListener('click', (e) => {
+      const btn = e.target.closest('.seg-btn'); if (!btn) return;
 
-    if (btn.dataset.view){
-      currentView = btn.dataset.view;
-      setSegActive('.usage-controls', btn);
+      if (btn.dataset.view){
+        currentView = btn.dataset.view;
+        setSegActive(btn);
 
-      if (!last || !last.labels || last.labels.length === 0) {
-        load();  // if nothing cached yet
-      } else {
-        const ci = CI_G_PER_KWH_DEFAULT;
-        const series = (currentView === 'elec')
-          ? last.kwh
-          : last.kwh.map(v => v * (ci/1000));
-        renderChart(last.labels, series, currentView);
-        if (currentView === 'elec') renderMetricsElec(last.total_kwh);
-        else renderMetricsCarbon(last.total_kwh, ci);
+        if (!last || !last.labels || last.labels.length === 0) {
+          load();  // if nothing cached yet
+        } else {
+          const ci = CI_G_PER_KWH_DEFAULT;
+          const series = (currentView === 'elec')
+            ? last.kwh
+            : last.kwh.map(v => v * (ci/1000));
+          renderChart(last.labels, series, currentView);
+          if (currentView === 'elec') renderMetricsElec(last.total_kwh);
+          else renderMetricsCarbon(last.total_kwh, ci);
+        }
       }
-    }
 
-    if (btn.dataset.range){
-      currentRange = btn.dataset.range;
-      setSegActive('.usage-controls', btn);
-      load(); // fetch only when range changes
-    }
-  });
+      if (btn.dataset.range){
+        currentRange = btn.dataset.range;
+        setSegActive(btn);
+        load(); // fetch only when range changes
+      }
+    });
+  }
 
-  $('#usageRetry').addEventListener('click', () => load());
+  const btnRetry = document.getElementById('usageRetry');
+  if (btnRetry) btnRetry.addEventListener('click', () => load());
 
   // initial load
   load();
