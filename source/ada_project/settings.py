@@ -1,4 +1,4 @@
-# ada_project/settings.py — DEV-ONLY, zero .env required
+# DEV-ONLY, zero .env required
 
 from pathlib import Path
 
