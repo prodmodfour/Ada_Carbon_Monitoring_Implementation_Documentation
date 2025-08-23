@@ -1,6 +1,7 @@
 /literature_review
 /rough_paper
 /documentation/implementation_plan.md
+documentation/carbon_monitoring_vialibity_report/
 __pycache__/
 *.db
 db.sqlite3
