@@ -4,23 +4,35 @@ from django.utils.timezone import now as tz_now
 from main.models import ProjectEnergy
 from main.views import (
     _prometheus_usage_series, _make_series, _bin_meta,
-    DEFAULT_TDP_SPEC, PROJECT_TO_LABELVAL, _spec_hash, _dbg
+    DEFAULT_TDP_SPEC, PROJECT_TO_LABELVAL, _spec_hash, _dbg, _cache_ttl_seconds
 )
 
 import time
 import urllib3
 
+
 class Command(BaseCommand):
     help = "Recompute and cache ProjectEnergy for given sources/ranges."
 
     def add_arguments(self, parser):
-        parser.add_argument("--sources", default="clf,isis,diamond",
-                            help="Comma list: clf,isis,diamond")
-        parser.add_argument("--ranges", default="day,month,year",
-                            help="Comma list: day,month,year")
+        parser.add_argument(
+            "--sources", default="clf,isis,diamond",
+            help="Comma list: clf,isis,diamond"
+        )
+        parser.add_argument(
+            "--ranges", default="day,month,year",
+            help="Comma list: day,month,year"
+        )
         parser.add_argument("--debug", action="store_true")
-        parser.add_argument("--force", action="store_true",
-                            help="Ignore TTL; always write a fresh row")
+        parser.add_argument(
+            "--force", action="store_true",
+            help="Always write a fresh row (ignore TTL / existing cache)"
+        )
+        parser.add_argument(
+            "--skip-fresh", action="store_true",
+            help="Skip writing if latest cache row is still within TTL (default: off)"
+        )
+
         # Optional overrides (same names as your view spec keys)
         parser.add_argument("--cpu-tdp-w", type=float)
         parser.add_argument("--ram-w", type=float)
@@ -30,18 +42,25 @@ class Command(BaseCommand):
         parser.add_argument("--other-w", type=float)
 
     def handle(self, *args, **opts):
-        debug = opts["debug"]
-        sources = [s.strip().lower() for s in opts["sources"].split(",") if s.strip()]
-        ranges  = [r.strip().lower() for r in opts["ranges"].split(",") if r.strip()]
+        # Silence InsecureRequestWarning for dev-only Prometheus with verify=False
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+        debug = opts["debug"]
+        force = opts["force"]
+        skip_fresh = opts["skip_fresh"]
+
+        sources = [s.strip().lower() for s in opts["sources"].split(",") if s.strip()]
+        ranges = [r.strip().lower() for r in opts["ranges"].split(",") if r.strip()]
+
+        # Build spec (CLI overrides -> spec dict)
         spec = DEFAULT_TDP_SPEC.copy()
         for cli_key, spec_key in [
-            ("cpu_tdp_w","cpu_tdp_w"),
-            ("ram_w","ram_w"),
-            ("gpu_tdp_w","gpu_tdp_w"),
-            ("cpu_count","cpu_count"),
-            ("gpu_count","gpu_count"),
-            ("other_w","other_w"),
+            ("cpu_tdp_w", "cpu_tdp_w"),
+            ("ram_w", "ram_w"),
+            ("gpu_tdp_w", "gpu_tdp_w"),
+            ("cpu_count", "cpu_count"),
+            ("gpu_count", "gpu_count"),
+            ("other_w", "other_w"),
         ]:
             v = opts.get(cli_key)
             if v is not None:
@@ -49,23 +68,41 @@ class Command(BaseCommand):
         shash = _spec_hash(spec)
 
         total_tasks = len(sources) * len(ranges)
-        self.stdout.write(self.style.NOTICE(
-            f"Spec {spec} hash={shash} | Tasks: {total_tasks} ({sources} × {ranges})"
-        ))
+        self.stdout.write(f"Spec {spec} hash={shash} | Tasks: {total_tasks} ({sources} × {ranges})")
 
         t0 = time.time()
         done = 0
+        skipped = 0
+        failed = 0
 
         for src in sources:
             for rng in ranges:
                 tic = time.time()
                 label = f"{src}:{rng}"
                 self.stdout.write(f"[RUN] {label} …")
+
+                # Optional TTL skip (only when asked, unless --force is set)
+                if not force and skip_fresh:
+                    latest = (
+                        ProjectEnergy.objects
+                        .filter(source=src, range_key=rng, spec_hash=shash)
+                        .order_by("-updated_at")
+                        .first()
+                    )
+                    if latest:
+                        age_s = (tz_now() - latest.updated_at).total_seconds()
+                        ttl_s = _cache_ttl_seconds(rng)
+                        if age_s < ttl_s:
+                            self.stdout.write(f"[SKIP] {label} (fresh {int(age_s)}s < TTL {ttl_s}s) id={latest.id}")
+                            skipped += 1
+                            continue
+
                 try:
                     if src in PROJECT_TO_LABELVAL:
                         labels, kwh = _prometheus_usage_series(src, rng, spec, debug)
                     else:
                         labels, kwh = _make_series(rng, spec)
+
                     total = round(sum(kwh), 3)
                     s, e, step = _bin_meta(rng)
 
@@ -86,7 +123,9 @@ class Command(BaseCommand):
                     self.stderr.write(self.style.ERROR(
                         f"[FAIL] {label} after {toc - tic:.1f}s: {e}"
                     ))
+                    failed += 1
 
-        self.stdout.write(self.style.NOTICE(
-            f"Completed {done}/{total_tasks} tasks in {time.time() - t0:.1f}s"
-        ))
+        self.stdout.write(
+            f"Completed {done}/{total_tasks} tasks "
+            f"(skipped fresh={skipped}, failed={failed}) in {time.time() - t0:.1f}s"
+        )
