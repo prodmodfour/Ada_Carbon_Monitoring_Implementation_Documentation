@@ -1,105 +1,100 @@
-
+# ada_project/settings.py — DEV-ONLY, zero .env required
 
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
-# This value is placeholder only; replace it with your own secret
-# in production environments.
-SECRET_KEY = 'django-insecure-change-me'
-
-# SECURITY WARNING: don't run with debug turned on in production!
+# --- Core (dev only) ---------------------------------------------------------
+SECRET_KEY = "django-insecure-dev-key-ok-for-local-only"
 DEBUG = True
+ALLOWED_HOSTS = ["*"]  # convenient for runserver on LAN / Codespaces
 
-# Allow all hosts during development; adjust in production.
-ALLOWED_HOSTS = ['*']
-
-# Application definition
+# --- Apps --------------------------------------------------------------------
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'main',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "main",
 ]
 
+# --- Middleware --------------------------------------------------------------
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = 'ada_project.urls'
+ROOT_URLCONF = "ada_project.urls"
 
+# --- Templates ---------------------------------------------------------------
+# APP_DIRS=True will pick up app templates at main/templates/*
+# We also allow (optional) project-level templates/ if you add it later.
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'main' / 'templates'],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "templates"],  # safe even if folder doesn't exist
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'ada_project.wsgi.application'
+WSGI_APPLICATION = "ada_project.wsgi.application"
 
-# Database
-# We use SQLite for demonstration; adjust as needed.
+# --- Database (SQLite for plug-and-play) ------------------------------------
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
     }
 }
 
-# Password validation
-AUTH_PASSWORD_VALIDATORS: list[dict] = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+# --- Password validation (keep defaults; fine for dev) -----------------------
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# Internationalization
-LANGUAGE_CODE = 'en-gb'
-TIME_ZONE = 'Europe/London'
+# --- Internationalization ----------------------------------------------------
+LANGUAGE_CODE = "en-gb"
+TIME_ZONE = "Europe/London"
 USE_I18N = True
-USE_L10N = True
-USE_TZ = True
+USE_TZ = True  
+# --- Static & Media (dev convenience) ----------------------------------------
+STATIC_URL = "/static/"
+# Serve your existing app-level assets from main/static during runserver
+STATICFILES_DIRS = [BASE_DIR / "main" / "static"]
+# Having STATIC_ROOT set is harmless in dev; ignored by runserver
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# Static files (CSS, JavaScript, Images)
-# During development Django serves static files from these directories.
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / 'main' / 'static']
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
-# Default primary key field type
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-
-PROMETHEUS_URL = 'https://host-172-16-100-248.nubes.stfc.ac.uk/'
-
-# PromQL fetch policy for /api/project-usage:
-#   "db_only"       -> never hit Prometheus from views; DB or 503
-#   "prom_on_miss"  -> current behavior (fetch Prom if DB missing/stale)
+# --- Project-specific knobs (kept inline for dev) ----------------------------
+PROMETHEUS_URL = "https://host-172-16-100-248.nubes.stfc.ac.uk/"
 PROM_DATA_MODE = "db_only"
+
+# --- Logging (simple console) -----------------------------------------------
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "root": {"handlers": ["console"], "level": "INFO"},
+}
