@@ -37,11 +37,11 @@ def _dbg(enabled: bool, *args) -> None:
 # Constants 
 # -----------------------------
 
-PROM_HTTP_TIMEOUT = (10, 600)  # (connect, read) seconds — generous for month/year windows
+
 DEFAULT_TDP_SPEC = {
     "cpu_count": 12,    # logical or physical; up to you
     "cpu_tdp_w": 12,    # per-core watts under typical load (not peak)
-    "gpu_count": 1,
+    "gpu_count": 0,
     "gpu_tdp_w": 250,   # per-GPU watts
     "ram_w": 20,        # system/ram etc
     "other_w": 30,      # misc platform overhead
