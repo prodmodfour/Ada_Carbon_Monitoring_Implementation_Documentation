@@ -97,6 +97,12 @@ class Workspace(models.Model):
     owner = models.CharField(max_length=128, blank=True, default="")
     hostname = models.CharField(max_length=255, blank=True, default="")
 
+
+    
+    # When this workspace actually began compute activity (UTC)
+    started_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+
     # Headline metrics
     runtime_seconds = models.BigIntegerField(default=0)    # total "active" runtime
     total_kwh       = models.FloatField(default=0.0)
@@ -133,6 +139,17 @@ class Workspace(models.Model):
         return f"{self.title} [{self.source}] · {self.total_kwh:.2f} kWh / {self.total_kg:.2f} kg"
 
     # ---------- helpers ----------
+    @property
+    def time_started(self):
+        return self.started_at
+
+    def mark_started(self, ts=None):
+        """Set start time once, if not already set."""
+        if not self.started_at:
+            self.started_at = ts or timezone.now()
+            self.save(update_fields=["started_at", "updated_at"])
+
+            
     @property
     def runtime_hours(self) -> float:
         return round(self.runtime_seconds / 3600.0, 3)
