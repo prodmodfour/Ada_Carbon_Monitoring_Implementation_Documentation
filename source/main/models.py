@@ -149,7 +149,7 @@ class Workspace(models.Model):
             self.started_at = ts or timezone.now()
             self.save(update_fields=["started_at", "updated_at"])
 
-            
+
     @property
     def runtime_hours(self) -> float:
         return round(self.runtime_seconds / 3600.0, 3)
@@ -211,3 +211,41 @@ class Workspace(models.Model):
             "avg_ci_g_per_kwh", "last_ci_g_per_kwh", "last_sampled_at",
             "updated_at",
         ])
+
+
+class InstrumentAverage(models.Model):
+    """
+    Rolling last-365-day average figures for a single instrument.
+    We keep history by always updating the latest row; feel free to
+    keep multiple rows if you want to see drift over time.
+    """
+    source = models.CharField(
+        max_length=16,
+        choices=(("clf", "CLF"), ("isis", "ISIS"), ("diamond", "Diamond")),
+        db_index=True,
+    )
+    instrument = models.CharField(max_length=64, db_index=True)
+
+    # Window we averaged over (UTC)
+    window_start = models.DateTimeField()
+    window_end   = models.DateTimeField()
+
+    # Results
+    avg_ci_g_per_kwh = models.FloatField()   # g/kWh over the window
+    kwh_per_hour     = models.FloatField()   # TDP-estimated draw while in use
+    kg_per_hour      = models.FloatField()   # kWh/h * (avg CI)/1000
+
+    # What we used to compute the TDP estimate (for transparency)
+    tdp_spec = models.JSONField(default=dict)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+        indexes = [
+            models.Index(fields=["source", "instrument", "-updated_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.source}:{self.instrument} · {self.kwh_per_hour:.2f} kWh/h · {self.kg_per_hour:.2f} kg/h"

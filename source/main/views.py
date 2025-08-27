@@ -24,7 +24,7 @@ from django.shortcuts import redirect, render
 from django.utils import timezone as dj_tz
 from django.utils.timezone import now as tz_now
 
-from .models import ProjectEnergy, Workspace
+from .models import ProjectEnergy, Workspace, InstrumentAverage
 
 # ========= DEBUG PRINT HELPER =========
 def _dbg(enabled: bool, *args) -> None:
@@ -287,9 +287,31 @@ def instruments(request: HttpRequest, source: str) -> HttpResponse:
     base_list = ISIS_INSTRUMENTS if source_key == "isis" else CLF_INSTRUMENTS
 
     enriched = []
+    now = dj_tz.now()
+
     for name in base_list:
-        kwh_h, kg_h = _instrument_hourly_figures(name)
-        enriched.append({"name": name, "kwh_per_hour": kwh_h, "kg_per_hour": kg_h})
+        row = (
+            InstrumentAverage.objects
+            .filter(source=source_key, instrument=name)
+            .order_by("-updated_at")
+            .first()
+        )
+
+        # Use cached last-year average if it's fresh (updated within ~45 days),
+        # otherwise fall back to your existing per-hour estimate.
+        if row and (now - row.updated_at).total_seconds() < 45 * 24 * 3600:
+            kwh_h = float(row.kwh_per_hour)
+            kg_h  = float(row.kg_per_hour)
+        else:
+            kwh_h, kg_h = _instrument_hourly_figures(name)
+
+        item = {"name": name, "kwh_per_hour": kwh_h, "kg_per_hour": kg_h}
+
+        # Optional: show grams if tiny (your template supports inst.g_per_hour)
+        if kg_h < 1.0:
+            item["g_per_hour"] = int(round(kg_h * 1000))
+
+        enriched.append(item)
 
     context = {
         "source_title": {
@@ -302,6 +324,7 @@ def instruments(request: HttpRequest, source: str) -> HttpResponse:
     }
     template_name = "instruments_isis.html" if source_key == "isis" else "instruments_clf.html"
     return render(request, template_name, context)
+
 
 def instrument_detail(request: HttpRequest, source: str, instrument: str) -> HttpResponse:
     # Only redirect after a real "Create Workspace" POST
