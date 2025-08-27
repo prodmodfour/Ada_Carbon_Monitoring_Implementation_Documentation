@@ -24,7 +24,7 @@ from django.shortcuts import redirect, render
 from django.utils import timezone as dj_tz
 from django.utils.timezone import now as tz_now
 
-from .models import ProjectEnergy
+from .models import ProjectEnergy, Workspace
 
 # ========= DEBUG PRINT HELPER =========
 def _dbg(enabled: bool, *args) -> None:
@@ -246,19 +246,41 @@ def home(request: HttpRequest) -> HttpResponse:
     return render(request, "home.html")
 
 def analysis(request: HttpRequest, source: str) -> HttpResponse:
-    items = _ensure_workspace_ids(request, source)
-    enriched = [{**ws, **_estimate_ws_metrics(ws)} for ws in items]
+    source_key = (source or "").lower()
+    rows = Workspace.objects.filter(source=source_key).order_by("-updated_at")[:50]
+
+    items = []
+    now = dj_tz.now()
+    for w in rows:
+        # average idle power so the front-end ticker can animate
+        started = w.started_at or w.created_at
+        elapsed_h = max(1e-6, (now - started).total_seconds() / 3600.0)
+        idle_w = (w.idle_kwh / elapsed_h) * 1000.0
+        ci = int(w.avg_ci_g_per_kwh or 220)
+
+        items.append({
+            "id": str(w.id),
+            "title": w.title or w.hostname or "Workspace",
+            "instrument": w.instrument,
+            "total_kwh": round(w.total_kwh, 3),
+            "idle_kwh":  round(w.idle_kwh, 3),
+            "total_kg":  round(w.total_kg, 3),
+            "idle_kg":   round(w.idle_kg, 3),
+            "idle_w":    round(idle_w, 1),
+            "ci":        ci,
+        })
 
     context = {
         "source_title": {
             "isis": "ISIS Data Analysis",
             "clf": "Central Laser Facility Data Analysis",
             "diamond": "Diamond Data Analysis",
-        }.get(source.lower(), f"{source.title()} Data Analysis"),
-        "source": source,
-        "workspaces": enriched,
+        }.get(source_key, f"{source.title()} Data Analysis"),
+        "source": source_key,
+        "workspaces": items,
     }
     return render(request, "analysis.html", context)
+
 
 def instruments(request: HttpRequest, source: str) -> HttpResponse:
     source_key = source.lower()

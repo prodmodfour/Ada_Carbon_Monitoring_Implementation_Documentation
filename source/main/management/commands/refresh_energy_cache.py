@@ -3,7 +3,7 @@ from django.utils.timezone import now as tz_now
 
 from main.models import ProjectEnergy
 from main.views import (
-    _prometheus_usage_series, _make_series, _bin_meta,
+    _prometheus_usage_series, _bin_meta,
     DEFAULT_TDP_SPEC, PROJECT_TO_LABELVAL, _spec_hash, _dbg, _cache_ttl_seconds
 )
 
@@ -98,11 +98,12 @@ class Command(BaseCommand):
                             continue
 
                 try:
-                    if src in PROJECT_TO_LABELVAL:
-                        labels, kwh = _prometheus_usage_series(src, rng, spec, debug)
-                    else:
-                        labels, kwh = _make_series(rng, spec)
-
+                    if src not in PROJECT_TO_LABELVAL:
+                            raise ValueError(
+                                f"Unknown source '{src}' — no PROJECT_TO_LABELVAL mapping. "
+                                "Define a Prometheus label mapping to proceed."
+                            )
+                    labels, kwh = _prometheus_usage_series(src, rng, spec, debug)
                     total = round(sum(kwh), 3)
                     s, e, step = _bin_meta(rng)
 
