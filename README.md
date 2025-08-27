@@ -2,7 +2,7 @@
 
 ### 1\. Clone the Repository
 
-First, clone the project from GitHub and navigate into the source directory.
+First, clone the project and navigate into the source directory.
 
 ```sh
 git clone https://github.com/prodmodfour/Mock_Ada_Carbon_Monitoring_Implementation.git
@@ -11,7 +11,7 @@ cd Mock_Ada_Carbon_Monitoring_Implementation/source
 
 ### 2\. Install Dependencies
 
-Next, upgrade your package installer (`pip`) and then install the required Python packages listed in `requirements.txt`.
+Next, upgrade `pip` and then install the required packages listed in `requirements.txt`.
 
 ```sh
 python -m pip install -U pip
@@ -20,7 +20,7 @@ pip install -r requirements.txt
 
 ### 3\. Set Up the Database
 
-Run the following commands to create the necessary database migrations and apply them.
+Run the following commands to create the necessary migrations and apply them.
 
 ```sh
 python manage.py makemigrations
@@ -29,7 +29,7 @@ python manage.py migrate
 
 ### 4\. Populate Initial Data
 
-These custom commands will populate the cache with necessary energy and instrument data.
+These commands will populate the cache with energy and instrument data.
 
 ```sh
 python manage.py refresh_energy_cache
