@@ -690,14 +690,18 @@ def _prom_query_range_chunked(
     """
     Query Prometheus in smaller windows and stitch the results together.
     Returns a {timestamp -> summed_value} map (like _ts_map_from_matrix).
-    We purposely overlap 1 step at chunk boundaries and *skip* duplicates,
-    to preserve continuity without double-counting.
+
+    We overlap one 'step' ONLY when another chunk follows, and we always
+    advance 'cur' to avoid repeating the same window.
     """
     if chunk_days is None:
         chunk_days = int(getattr(settings, "PROM_CHUNK_DAYS", 1) or 1)
 
+    # Parse/guard
     chunk_sec = max(1, int(chunk_days) * 86400)
     step_s = _parse_step_seconds(step)
+    if step_s <= 0:
+        step_s = 60  # fallback sanity
 
     acc: Dict[int, float] = {}
     cur = start
@@ -705,26 +709,37 @@ def _prom_query_range_chunked(
 
     while cur < end:
         sub_end = min(end, cur + chunk_sec)
+
         try:
             mat = _prom_query_range(expr, cur, sub_end, step, debug)
             sub_ts = _ts_map_from_matrix(mat, debug, f"chunk {n_chunks}:{cur}->{sub_end}")
 
-            # Merge without double-counting the boundary sample
+            # Merge without double-counting
             for ts, v in sub_ts.items():
-                if ts in acc:
-                    continue
-                acc[ts] = v
+                if ts not in acc:
+                    acc[ts] = v
 
             n_chunks += 1
         except Exception as e:
             _dbg(debug, "Q_RANGE_CHUNK_ERR", {"from": cur, "to": sub_end, "err": repr(e)})
             raise
 
-        # Overlap by one step to keep continuity; duplicates are skipped above.
-        cur = sub_end - step_s
+        # If we just did the final chunk, stop.
+        if sub_end >= end:
+            break
+
+        # Otherwise, overlap by one step to keep continuity.
+        next_cur = sub_end - step_s
+
+        # Safety: always make forward progress even if step_s >= chunk_sec.
+        if next_cur <= cur:
+            next_cur = sub_end
+
+        cur = next_cur
 
     _dbg(debug, "Q_RANGE_CHUNKED_OK", {"chunks": n_chunks, "points": len(acc)})
     return acc
+
 
 
 
@@ -787,21 +802,11 @@ def _prometheus_usage_series(source_key: str, range_key: str, spec: dict, debug:
     expr_cpu_rich = f'sum( ({expr_util}) * on(instance) group_left() ({expr_cores}) ) * {spec["cpu_tdp_w"]}'
     _dbg(debug, "EXPR_CPU", expr_cpu_rich)
 
-    try:
-        cpu_ts = _prom_query_range_chunked(
-            expr_cpu_rich, start, end, step_str,
-            chunk_days=getattr(settings, "PROM_CHUNK_DAYS", 1),
-            debug=debug,
-        )
-    except Exception as e:
-        _dbg(debug, "CPU_EXPR_FALLBACK", repr(e))
-        expr_cpu_fast = f'sum(rate(node_cpu_seconds_total{{mode!="idle",cloud_project_name="{label_val}"}}[{rate_win}])) * {spec["cpu_tdp_w"]}'
-        _dbg(debug, "EXPR_CPU_FAST", expr_cpu_fast)
-        cpu_ts = _prom_query_range_chunked(
-            expr_cpu_fast, start, end, step_str,
-            chunk_days=getattr(settings, "PROM_CHUNK_DAYS", 1),
-            debug=debug,
-        )
+    cpu_ts = _prom_query_range_chunked(
+        expr_cpu_rich, start, end, step_str,
+        chunk_days=getattr(settings, "PROM_CHUNK_DAYS", 1),
+        debug=debug,
+    )
 
     expr_ram = f'sum( node_memory_Active_bytes{{cloud_project_name="{label_val}"}} / node_memory_MemTotal_bytes{{cloud_project_name="{label_val}"}} ) * {spec["ram_w"]}'
     _dbg(debug, "EXPR_RAM", expr_ram)
