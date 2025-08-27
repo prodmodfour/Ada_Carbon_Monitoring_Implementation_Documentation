@@ -689,19 +689,22 @@ def _prom_query_range_chunked(
 ) -> Dict[int, float]:
     """
     Query Prometheus in smaller windows and stitch the results together.
-    Returns a {timestamp -> summed_value} map (like _ts_map_from_matrix).
+    Returns a {timestamp -> value} map (like _ts_map_from_matrix).
 
-    We overlap one 'step' ONLY when another chunk follows, and we always
-    advance 'cur' to avoid repeating the same window.
+    - Overlaps by one 'step' between chunks (never on the final chunk).
+    - Retries each chunk request up to PROM_CHUNK_RETRIES times,
+      sleeping PROM_CHUNK_RETRY_SLEEP_S seconds between attempts.
     """
     if chunk_days is None:
         chunk_days = int(getattr(settings, "PROM_CHUNK_DAYS", 1) or 1)
 
-    # Parse/guard
     chunk_sec = max(1, int(chunk_days) * 86400)
     step_s = _parse_step_seconds(step)
     if step_s <= 0:
-        step_s = 60  # fallback sanity
+        step_s = 60  # sane fallback
+
+    retries = int(getattr(settings, "PROM_CHUNK_RETRIES", 5) or 5)
+    sleep_s = int(getattr(settings, "PROM_CHUNK_RETRY_SLEEP_S", 15) or 15)
 
     acc: Dict[int, float] = {}
     cur = start
@@ -710,19 +713,32 @@ def _prom_query_range_chunked(
     while cur < end:
         sub_end = min(end, cur + chunk_sec)
 
-        try:
-            mat = _prom_query_range(expr, cur, sub_end, step, debug)
-            sub_ts = _ts_map_from_matrix(mat, debug, f"chunk {n_chunks}:{cur}->{sub_end}")
+        # --- retry loop for this chunk ---
+        attempt = 1
+        while True:
+            try:
+                mat = _prom_query_range(expr, cur, sub_end, step, debug)
+                sub_ts = _ts_map_from_matrix(mat, debug, f"chunk {n_chunks}:{cur}->{sub_end}")
 
-            # Merge without double-counting
-            for ts, v in sub_ts.items():
-                if ts not in acc:
-                    acc[ts] = v
+                # Merge without double-counting (boundaries may overlap by one step)
+                for ts, v in sub_ts.items():
+                    if ts not in acc:
+                        acc[ts] = v
 
-            n_chunks += 1
-        except Exception as e:
-            _dbg(debug, "Q_RANGE_CHUNK_ERR", {"from": cur, "to": sub_end, "err": repr(e)})
-            raise
+                n_chunks += 1
+                break  # success for this chunk
+            except Exception as e:
+                _dbg(debug, "Q_RANGE_RETRY",
+                     {"chunk": n_chunks, "from": cur, "to": sub_end, "attempt": attempt, "err": repr(e)})
+                if attempt >= retries:
+                    _dbg(debug, "Q_RANGE_CHUNK_ERR_FINAL",
+                         {"chunk": n_chunks, "from": cur, "to": sub_end, "attempts": attempt})
+                    raise
+                # Wait then try again
+                _dbg(debug, "Q_RANGE_RETRY_SLEEP", {"seconds": sleep_s})
+                time.sleep(sleep_s)
+                attempt += 1
+        # --- end retry loop ---
 
         # If we just did the final chunk, stop.
         if sub_end >= end:
@@ -739,6 +755,7 @@ def _prom_query_range_chunked(
 
     _dbg(debug, "Q_RANGE_CHUNKED_OK", {"chunks": n_chunks, "points": len(acc)})
     return acc
+
 
 
 
