@@ -58,13 +58,9 @@ This note explains how the **workspace** metrics are collected, stored, and disp
 ## Configuration knobs (in the command)
 
 * **Site mapping** → Prom label: `clf/isis/diamond → cloud_project_name` values.
-* **Power model**: `cpu_tdp_w`, `ram_w`, `other_w` (simple, easy to tune).
+* **Power model**: `cpu_tdp_w`, `ram_w`, `other_w` 
 * **Carbon intensity**: fetched live (cached \~5 minutes); fallback used if API is down.
 
-## Troubleshooting
 
-* **No cards / empty page**: check the poller logs; verify Prometheus is reachable and hosts report `up==1` with the right `cloud_project_name`.
-* **Zeros for energy/emissions**: hosts may be idle or counters missing; verify `node_exporter` metrics.
-* **CI not changing**: confirm the Carbon Intensity API is reachable from the server.
 
 
