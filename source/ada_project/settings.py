@@ -91,11 +91,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 PROMETHEUS_URL = "https://host-172-16-100-248.nubes.stfc.ac.uk/"
 PROM_DATA_MODE = "prom_on_miss"
 # Day by day recommended, the prometheus server tends to time out on larger requests
-PROM_CHUNK_DAYS = 1
+PROM_CHUNK_DAYS = 7
 PROM_CHUNK_RETRIES = 5
 PROM_CHUNK_RETRY_SLEEP_S = 15
 
-# --- Logging (simple console) -----------------------------------------------
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
