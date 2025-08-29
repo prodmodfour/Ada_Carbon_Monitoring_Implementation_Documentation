@@ -33,7 +33,7 @@ class Command(BaseCommand):
             help="Skip writing if latest cache row is still within TTL (default: off)"
         )
 
-        # Optional overrides (same names as your view spec keys)
+        # Optional overrides (same names as view spec keys)
         parser.add_argument("--cpu-tdp-w", type=float)
         parser.add_argument("--ram-w", type=float)
         parser.add_argument("--gpu-tdp-w", type=float)
@@ -62,9 +62,9 @@ class Command(BaseCommand):
             ("gpu_count", "gpu_count"),
             ("other_w", "other_w"),
         ]:
-            v = opts.get(cli_key)
-            if v is not None:
-                spec[spec_key] = v
+            value = opts.get(cli_key)
+            if value is not None:
+                spec[spec_key] = value
         shash = _spec_hash(spec)
 
         total_tasks = len(sources) * len(ranges)
