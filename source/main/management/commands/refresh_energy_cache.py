@@ -52,20 +52,6 @@ class Command(BaseCommand):
         sources = [s.strip().lower() for s in opts["sources"].split(",") if s.strip()]
         ranges = [r.strip().lower() for r in opts["ranges"].split(",") if r.strip()]
 
-        # Build spec (CLI overrides -> spec dict)
-        spec = DEFAULT_TDP_SPEC.copy()
-        for cli_key, spec_key in [
-            ("cpu_tdp_w", "cpu_tdp_w"),
-            ("ram_w", "ram_w"),
-            ("gpu_tdp_w", "gpu_tdp_w"),
-            ("cpu_count", "cpu_count"),
-            ("gpu_count", "gpu_count"),
-            ("other_w", "other_w"),
-        ]:
-            v = opts.get(cli_key)
-            if v is not None:
-                spec[spec_key] = v
-        shash = _spec_hash(spec)
 
         total_tasks = len(sources) * len(ranges)
 
