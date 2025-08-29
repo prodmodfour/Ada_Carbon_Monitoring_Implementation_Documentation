@@ -85,7 +85,11 @@ def _spec_hash(spec: dict) -> str:
     return hashlib.sha1(payload).hexdigest()
 
 def _cache_ttl_seconds(range_key: str) -> int:
-    return {"day": 3600, "month": 24 * 3600, "year": 24 * 3600}[range_key]
+    return {
+        "day": 3600,                      # 1 hour
+        "month": 30 * 24 * 3600,          # 30 days
+        "year": 365 * 24 * 3600           # 365 days
+    }[range_key]
 
 def _bin_meta(range_key: str) -> Tuple[int, int, int]:
     end = int(time.time())
