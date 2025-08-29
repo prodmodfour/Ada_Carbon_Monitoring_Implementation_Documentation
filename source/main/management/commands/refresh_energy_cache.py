@@ -68,7 +68,6 @@ class Command(BaseCommand):
         shash = _spec_hash(spec)
 
         total_tasks = len(sources) * len(ranges)
-        self.stdout.write(f"Spec {spec} hash={shash} | Tasks: {total_tasks} ({sources} × {ranges})")
 
         t0 = time.time()
         done = 0
