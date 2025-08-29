@@ -75,40 +75,40 @@ class Command(BaseCommand):
         skipped = 0
         failed = 0
 
-        for src in sources:
-            for rng in ranges:
+        for source in sources:
+            for range in ranges:
                 tic = time.time()
-                label = f"{src}:{rng}"
+                label = f"{source}:{range}"
                 self.stdout.write(f"[RUN] {label} …")
 
                 # Optional TTL skip (only when asked, unless --force is set)
                 if not force and skip_fresh:
                     latest = (
                         ProjectEnergy.objects
-                        .filter(source=src, range_key=rng, spec_hash=shash)
+                        .filter(source=source, range_key=range, spec_hash=shash)
                         .order_by("-updated_at")
                         .first()
                     )
                     if latest:
                         age_s = (tz_now() - latest.updated_at).total_seconds()
-                        ttl_s = _cache_ttl_seconds(rng)
+                        ttl_s = _cache_ttl_seconds(range)
                         if age_s < ttl_s:
                             self.stdout.write(f"[SKIP] {label} (fresh {int(age_s)}s < TTL {ttl_s}s) id={latest.id}")
                             skipped += 1
                             continue
 
                 try:
-                    if src not in PROJECT_TO_LABELVAL:
+                    if source not in PROJECT_TO_LABELVAL:
                             raise ValueError(
-                                f"Unknown source '{src}' — no PROJECT_TO_LABELVAL mapping. "
+                                f"Unknown source '{source}' — no PROJECT_TO_LABELVAL mapping. "
                                 "Define a Prometheus label mapping to proceed."
                             )
-                    labels, kwh = _prometheus_usage_series(src, rng, spec, debug)
+                    labels, kwh = _prometheus_usage_series(source, range, spec, debug)
                     total = round(sum(kwh), 3)
-                    s, e, step = _bin_meta(rng)
+                    s, e, step = _bin_meta(range)
 
                     row = ProjectEnergy.objects.create(
-                        source=src, range_key=rng,
+                        source=source, range_key=range,
                         spec_hash=shash, spec_json=spec,
                         labels=labels, kwh=kwh, total_kwh=total,
                         start_unix=s, end_unix=e, step_seconds=step,
