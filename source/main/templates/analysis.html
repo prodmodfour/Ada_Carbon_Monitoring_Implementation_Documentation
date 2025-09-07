@@ -114,18 +114,21 @@
         </div>
       </section>
 
-      <!-- Estimated Electricity Usage (Project) -->
+      <!-- Estimated Electricity / Carbon Usage (HTMX + Plotly) -->
       <section class="usage-card">
         <div class="usage-head">
           <div>
-            <div class="usage-title">Estimated Electricity Usage (Project)</div>
+            <div class="usage-title">Estimated Usage (Project)</div>
+            <div class="usage-caption">Switch view and range; the chart updates without a full page reload.</div>
           </div>
-          <div class="usage-controls">
-            <div class="seg">
-              <button class="seg-btn active" data-view="elec" aria-pressed="true">Electricity</button>
-              <button class="seg-btn" data-view="carbon" aria-pressed="false">Carbon</button>
+
+          <div class="usage-controls" id="usageControls"
+               data-url-template="{% url 'get_usage_plot' source 'RANGE' 'VIEW' %}">
+            <div class="seg" role="tablist" aria-label="Metric">
+              <button class="seg-btn active" data-view="electricity" aria-selected="true" role="tab">Electricity</button>
+              <button class="seg-btn" data-view="carbon" aria-selected="false" role="tab">Carbon</button>
             </div>
-            <div class="seg">
+            <div class="seg" role="group" aria-label="Range">
               <button class="seg-btn active" data-range="day" aria-pressed="true">Day</button>
               <button class="seg-btn" data-range="month" aria-pressed="false">Month</button>
               <button class="seg-btn" data-range="year" aria-pressed="false">Year</button>
@@ -137,46 +140,33 @@
         </div>
 
         <div class="usage-popover hidden" id="usageHelp" role="dialog"
-             aria-modal="true" aria-label="About Estimated Electricity Usage (Project)">
+             aria-modal="true" aria-label="About Estimated Usage (Project)">
           <button class="usage-popover-close" id="usageHelpClose" aria-label="Close">×</button>
 
-          <h4>How we estimate electricity (TDP-based)</h4>
+          <h4>How the estimate is built</h4>
           <ol class="usage-popover-list">
-            <li><strong>Component power (Watts)</strong> = CPUs × CPU&nbsp;TDP + GPUs × GPU&nbsp;TDP + RAM&nbsp;W + Other&nbsp;W.</li>
-            <li><strong>Utilization profile</strong> scales those Watts per time bin (hour/day/month).</li>
-            <li><strong>Energy (kWh)</strong> = Watts ÷ 1000 × duration (hours), summed across bins.</li>
-            <li><strong>Carbon (kg&nbsp;CO₂e)</strong> = Energy × grid carbon intensity (g&nbsp;CO₂/kWh ÷ 1000), using location-based factors.</li>
+            <li><strong>Electricity:</strong> sums estimated watt-hours per bin and converts to kWh.</li>
+            <li><strong>Carbon:</strong> multiplies kWh by grid intensity to get kg CO₂e.</li>
+            <li>Data shown uses your project’s parquet series, resampled by hour/day/month.</li>
           </ol>
-
-          <h4>Why use TDP?</h4>
-          <p>When direct metering isn’t available, many tools estimate power from manufacturer TDPs combined with utilization (often using conservative scaling). See:</p>
-          <ul class="usage-sources">
-            <li><a href="https://mlco2.github.io/codecarbon/methodology.html" target="_blank" rel="noopener">CodeCarbon methodology (TDP lookup & fallback)</a></li>
-            <li><a href="https://github.com/Green-Software-Foundation/sci-data-guidance/blob/dev/use-case-submissions/msft-eShoppen.md" target="_blank" rel="noopener">Green Software Foundation SCI data guidance (TDP for components)</a></li>
-            <li><a href="https://www.etsy.com/codeascraft/cloud-jewels-estimating-kwh-in-the-cloud" target="_blank" rel="noopener">Etsy Cloud Jewels (kWh estimation in the cloud)</a></li>
-            <li><a href="https://www.cloudcarbonfootprint.org/docs/methodology/" target="_blank" rel="noopener">Cloud Carbon Footprint (estimation methodology)</a></li>
-            <li><a href="https://carbon-intensity.github.io/api-definitions/" target="_blank" rel="noopener">GB Carbon Intensity API (g&nbsp;CO₂/kWh, forecasts)</a></li>
-            <li><a href="https://boavizta.org/en/blog/calculettes-carbone-clouds-providers" target="_blank" rel="noopener">Boavizta — prefer location-based factors</a></li>
-          </ul>
         </div>
 
         <div class="usage-body">
-          <div class="usage-chart">
-            <canvas id="usageChart"></canvas>
+          <div id="usagePlot" class="usage-chart">
+            {{ usage_plot_div|safe }}
           </div>
           <aside class="usage-metrics">
             <div class="metric-card">
-              <div class="metric-title" id="metricTitle">Electricity equivalency</div>
-              <ul class="metric-list" id="metricList"><!-- filled by JS --></ul>
-            </div>
-            <div class="metric-card">
-              <div class="metric-title">Totals</div>
-              <ul class="metric-list" id="metricTotals"><!-- filled by JS --></ul>
+              <div class="metric-title">Tips</div>
+              <ul class="metric-list">
+                <li>Use “Carbon” to compare against policy targets.</li>
+                <li>Switch to “Month” to smooth day-to-day variance.</li>
+                <li>“Year” highlights seasonal usage patterns.</li>
+              </ul>
             </div>
           </aside>
         </div>
 
-        <div class="usage-note" id="usageNote"></div>
         <div class="ci-error hidden" id="usageErr" role="alert">
           <span id="usageErrMsg">Unable to load usage.</span>
           <button id="usageRetry" class="pill">Retry</button>
@@ -216,42 +206,40 @@
               </div>
 
               <!-- Workspace Figures (Electricity & Carbon) -->
-<div class="ws-figures"
-data-total-kwh="{{ ws.total_kwh|default:0 }}"
-data-idle-kwh="{{ ws.idle_kwh|default:0 }}"
-data-total-kg="{{ ws.total_kg|default:0 }}"
-data-idle-kg="{{ ws.idle_kg|default:0 }}"
-data-idle-w="{{ ws.idle_w|default:0 }}"
-data-ci="{{ ws.ci|default:220 }}">
+              <div class="ws-figures"
+                   data-total-kwh="{{ ws.total_kwh|default:0 }}"
+                   data-idle-kwh="{{ ws.idle_kwh|default:0 }}"
+                   data-total-kg="{{ ws.total_kg|default:0 }}"
+                   data-idle-kg="{{ ws.idle_kg|default:0 }}"
+                   data-idle-w="{{ ws.idle_w|default:0 }}"
+                   data-ci="{{ ws.ci|default:220 }}">
+                <div class="figure-row">
+                  <div class="figure-label">Electricity (kWh)</div>
+                  <div class="figure-bar" data-kind="kwh" role="img"
+                       aria-label="Idle {{ ws.idle_kwh|default:0 }} of {{ ws.total_kwh|default:0 }} kWh"></div>
+                  <div class="figure-legend">
+                    <span>Total: {{ ws.total_kwh|default:0 }}</span>
+                    <span>Idle: {{ ws.idle_kwh|default:0 }}</span>
+                  </div>
+                </div>
 
-<div class="figure-row">
-<div class="figure-label">Electricity (kWh)</div>
-<div class="figure-bar" data-kind="kwh" role="img"
-    aria-label="Idle {{ ws.idle_kwh|default:0 }} of {{ ws.total_kwh|default:0 }} kWh"></div>
-<div class="figure-legend">
- <span>Total: {{ ws.total_kwh|default:0 }}</span>
- <span>Idle: {{ ws.idle_kwh|default:0 }}</span>
-</div>
-</div>
+                <div class="figure-row">
+                  <div class="figure-label">Carbon (kg&nbsp;CO₂e)</div>
+                  <div class="figure-bar" data-kind="kg" role="img"
+                       aria-label="Idle {{ ws.idle_kg|default:0 }} of {{ ws.total_kg|default:0 }} kg CO₂e"></div>
+                  <div class="figure-legend">
+                    <span>Total: {{ ws.total_kg|default:0 }}</span>
+                    <span>Idle: {{ ws.idle_kg|default:0 }}</span>
+                  </div>
+                </div>
 
-<div class="figure-row">
-<div class="figure-label">Carbon (kg&nbsp;CO₂e)</div>
-<div class="figure-bar" data-kind="kg" role="img"
-    aria-label="Idle {{ ws.idle_kg|default:0 }} of {{ ws.total_kg|default:0 }} kg CO₂e"></div>
-<div class="figure-legend">
- <span>Total: {{ ws.total_kg|default:0 }}</span>
- <span>Idle: {{ ws.idle_kg|default:0 }}</span>
-</div>
-</div>
-
-<div class="idle-live">
-<span class="idle-dot" aria-hidden="true"></span>
-<strong>Idle use counter:</strong>
-<span class="idle-kwh-counter">0.000</span> kWh ·
-<span class="idle-kg-counter">0.0000</span> kg CO₂e
-</div>
-</div>
-
+                <div class="idle-live">
+                  <span class="idle-dot" aria-hidden="true"></span>
+                  <strong>Idle use counter:</strong>
+                  <span class="idle-kwh-counter">0.000</span> kWh ·
+                  <span class="idle-kg-counter">0.0000</span> kg CO₂e
+                </div>
+              </div>
 
               <div class="workspace-actions">
                 <button class="start-btn" disabled>START JUPYTER</button>
@@ -268,10 +256,11 @@ data-ci="{{ ws.ci|default:220 }}">
     </main>
   </div>
 
-  <!-- Chart.js CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>          <!-- for CI chart -->
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>             <!-- for usage chart swapping -->
 
-  <!-- Carbon Intensity Forecast script -->
+  <!-- Carbon Intensity Forecast script (unchanged) -->
   <script>
 (() => {
   // ===== Utilities =====
@@ -460,8 +449,8 @@ data-ci="{{ ws.ci|default:220 }}">
   }
 
   async function loadRange(fromLocal, toLocal, { clamp48 = true } = {}) {
-    const { from, to, capped } = clamp48 ? cap48(fromLocal, toLocal) : { from: fromLocal, to: toLocal, capped: false };
-    const url = buildUrl(from, to);
+    const max = clamp48 ? cap48(fromLocal, toLocal) : { from: fromLocal, to: toLocal, capped: false };
+    const url = buildUrl(max.from, max.to);
 
     if (elError) elError.classList.add('hidden');
     if (elNote) elNote.textContent = 'Loading forecast…';
@@ -476,14 +465,14 @@ data-ci="{{ ws.ci|default:220 }}">
 
       state.labels = buildLabels(items);
       state.values = values;
-      state.from = from;
-      state.to = to;
+      state.from = max.from;
+      state.to = max.to;
 
       const best = best3hWindow(values);
       state.band = best ? [best.i, best.i + 5] : null;
 
       renderChart();
-      setNote(from, to, capped, best, state.labels);
+      setNote(max.from, max.to, max.capped, best, state.labels);
       if (elRefreshed) elRefreshed.textContent = `· refreshed ${new Date().toLocaleTimeString()}`;
     } catch (err) {
       if (elErrMsg) elErrMsg.textContent = `Unable to load forecast (${err.message}).`;
@@ -494,7 +483,6 @@ data-ci="{{ ws.ci|default:220 }}">
 
   function setActive(btn) {
     if (!btn) return;
-    // scope to the clicked group only
     const group = btn.closest('.ci-controls') || btn.parentElement;
     if (!group) return;
     const pills = Array.from(group.querySelectorAll('.pill'));
@@ -612,209 +600,99 @@ data-ci="{{ ws.ci|default:220 }}">
 })();
   </script>
 
-  <!-- Usage card script -->
+  <!-- Usage (HTMX) wiring for Plotly chart -->
   <script>
 (() => {
-  const $  = (s) => document.querySelector(s);
+  const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
 
-  const CI_G_PER_KWH_DEFAULT = 220;
-  const CAR_KG_PER_KM        = 0.171;
-  const TREE_KG_PER_YEAR     = 21;
-  const PARIS_DUBAI_KG       = 1000;
+  const controls = $('#usageControls');
+  const plot = $('#usagePlot');
+  const err = $('#usageErr');
+  const errMsg = $('#usageErrMsg');
 
-  const SOURCE = "{{ source }}";
-  const dataCache = new Map();                    // key = `${SOURCE}:${range}`
-  let currentView = 'elec';
+  if (!controls || !plot) return;
+
+  let currentView = 'electricity';
   let currentRange = 'day';
-  let isLoading = false;
-  let last = { labels: [], kwh: [], total_kwh: 0 };
-  let chart;
 
-  const canvas = document.getElementById('usageChart');
-  if (!canvas || typeof Chart === 'undefined') return; // guard
-  const elChart = canvas.getContext('2d');
-
-  const elMetrics = $('#metricList');
-  const elTotals  = $('#metricTotals');
-  const elTitle   = $('#metricTitle');
-  const elNote    = $('#usageNote');
-  const elErr     = $('#usageErr');
-  const elErrMsg  = $('#usageErrMsg');
-  const elUsageHelpBtn   = document.getElementById('usageHelpBtn');
-  const elUsageHelp      = document.getElementById('usageHelp');
-  const elUsageHelpClose = document.getElementById('usageHelpClose');
-  const elControls = document.querySelector('.usage-controls');
-  let usageHelpOpen = false, usageOutside = null, usageEsc = null;
-
-  function fmt(n, digits=0) { return Number(n).toLocaleString(undefined, { maximumFractionDigits: digits }); }
-
-  // Scope the "active" toggle to the clicked segment group only
   function setSegActive(btn){
     if (!btn) return;
     const group = btn.closest('.seg');
-    if (!group) return;
-    group.querySelectorAll('.seg-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed','false'); });
-    btn.classList.add('active'); btn.setAttribute('aria-pressed','true');
+    group.querySelectorAll('.seg-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed','false'); b.setAttribute('aria-selected','false'); });
+    btn.classList.add('active'); btn.setAttribute('aria-pressed','true'); btn.setAttribute('aria-selected','true');
   }
 
-  async function fetchUsage(range, { refresh = false } = {}){
-    const key = `${SOURCE}:${range}`;
-    if (!refresh && dataCache.has(key)) return dataCache.get(key);
-
-    const url = `/api/project-usage?range=${encodeURIComponent(range)}&source=${SOURCE}`;
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    dataCache.set(key, json);
-    return json;
+  function templateUrl(){
+    const tpl = controls.getAttribute('data-url-template') || '';
+    // Replace only the placeholders we inserted in the Django URL helper
+    return tpl.replace('/RANGE/', `/${currentRange}/`).replace('/VIEW/', `/${currentView}/`);
   }
 
-  function renderChart(labels, series, view){
-    const yTitle = view === 'elec' ? 'Energy (kWh)' : 'Emissions (kg CO₂e)';
-    const unitForTooltip = view === 'elec' ? 'kWh' : 'kg CO₂e';
-    const data = { labels, datasets: [{ data: series, borderWidth: 0, backgroundColor: 'rgba(66,133,244,0.7)' }] };
-    const options = {
-      responsive: true, maintainAspectRatio: false, resizeDelay: 150,
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => `${fmt(ctx.parsed.y, 2)} ${unitForTooltip}` } }
-      },
-      scales: {
-        x: { grid: { display: false } },
-        y: {
-          grid: { color: '#eee' },
-          title: { display: true, text: yTitle },
-          ticks: { callback: (v) => v }
-        }
-      }
-    };
-    if (chart) { chart.data = data; chart.options = options; chart.update(); }
-    else { chart = new Chart(elChart, { type: 'bar', data, options }); }
-  }
-
-  function renderMetricsElec(totalKWh){
-    if (!elTitle || !elMetrics || !elTotals) return;
-    elTitle.textContent = 'Electricity equivalency';
-    elMetrics.innerHTML = `
-      <li><strong>${fmt(totalKWh,2)} kWh</strong> total</li>
-      <li>≈ ${fmt(totalKWh / 0.06)} light-bulb hours (60W)</li>
-      <li>≈ ${fmt(totalKWh / 0.065)} laptop hours (65W)</li>
-      <li>≈ ${fmt(totalKWh / 0.11)} kettle boils (0.11 kWh/boil)</li>
-    `;
-    elTotals.innerHTML = `
-      <li>Average per bin: ${fmt(totalKWh / Math.max(1, last.labels.length), 2)} kWh</li>
-    `;
-  }
-
-  function renderMetricsCarbon(totalKWh, gPerKWh){
-    if (!elTitle || !elMetrics || !elTotals) return;
-    const kg = totalKWh * (gPerKWh / 1000);
-    elTitle.textContent = 'Carbon equivalency';
-    elMetrics.innerHTML = `
-      <li><strong>${fmt(kg,0)} kg CO₂e</strong> (at ${gPerKWh} g/kWh)</li>
-      <li>≈ ${fmt(kg / TREE_KG_PER_YEAR,1)} tree-years</li>
-      <li>≈ ${fmt(kg / CAR_KG_PER_KM,0)} car km</li>
-      <li>≈ ${fmt((kg / PARIS_DUBAI_KG) * 100,1)}% of a Paris→Dubai flight</li>
-    `;
-    elTotals.innerHTML = `
-      <li>Total electricity: ${fmt(last.total_kwh,2)} kWh</li>
-      <li>Average per bin: ${fmt(last.total_kwh / Math.max(1,last.labels.length), 2)} kWh</li>
-    `;
-  }
-
-  function openUsageHelp(){
-    if (usageHelpOpen || !elUsageHelp || !elUsageHelpBtn) return;
-    elUsageHelp.classList.remove('hidden');
-    elUsageHelpBtn.setAttribute('aria-expanded','true');
-    usageHelpOpen = true;
-
-    usageOutside = (e) => { if (!elUsageHelp.contains(e.target) && e.target !== elUsageHelpBtn) closeUsageHelp(); };
-    usageEsc = (e) => { if (e.key === 'Escape') closeUsageHelp(); };
-    document.addEventListener('mousedown', usageOutside);
-    document.addEventListener('keydown', usageEsc);
-  }
-  function closeUsageHelp(){
-    if (!usageHelpOpen || !elUsageHelp || !elUsageHelpBtn) return;
-    elUsageHelp.classList.add('hidden');
-    elUsageHelpBtn.setAttribute('aria-expanded','false');
-    usageHelpOpen = false;
-    document.removeEventListener('mousedown', usageOutside);
-    document.removeEventListener('keydown', usageEsc);
-  }
-  if (elUsageHelpBtn && elUsageHelp && elUsageHelpClose) {
-    elUsageHelpBtn.addEventListener('click', () => usageHelpOpen ? closeUsageHelp() : openUsageHelp());
-    elUsageHelpClose.addEventListener('click', closeUsageHelp);
-  }
-
-  async function load(range = currentRange){
-    if (isLoading) return;
-    isLoading = true;
+  async function refresh(){
     try{
-      if (elErr) elErr.classList.add('hidden');
-
-      // Only fetch when the range changes or not cached yet
-      const data = await fetchUsage(range);
-      last = data;
-
-      const ci = CI_G_PER_KWH_DEFAULT;
-      const series = (currentView === 'elec')
-        ? data.kwh
-        : data.kwh.map(v => v * (ci/1000));
-
-      renderChart(data.labels, series, currentView);
-
-      if (currentView === 'elec') renderMetricsElec(data.total_kwh);
-      else renderMetricsCarbon(data.total_kwh, ci);
-
-      if (elNote) elNote.textContent = '';
-    }catch(err){
-      if (elErrMsg) elErrMsg.textContent = `Unable to load usage (${err.message}).`;
-      if (elErr) elErr.classList.remove('hidden');
-    } finally {
-      isLoading = false;
+      if (err) err.classList.add('hidden');
+      const url = templateUrl();
+      const resp = await fetch(url, { headers: { 'HX-Request': 'true' }, cache: 'no-store' });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const html = await resp.text();
+      plot.innerHTML = html;
+      // Plotly JS is already included in initial div via CDN; the partials do not include it again.
+    }catch(e){
+      if (errMsg) errMsg.textContent = `Unable to load usage (${e.message}).`;
+      if (err) err.classList.remove('hidden');
     }
   }
 
-  // Re-render immediately on view change (no fetch); fetch on range change.
-  if (elControls) {
-    elControls.addEventListener('click', (e) => {
-      const btn = e.target.closest('.seg-btn'); if (!btn) return;
+  controls.addEventListener('click', (e) => {
+    const btn = e.target.closest('.seg-btn'); if (!btn) return;
+    if (btn.dataset.view){
+      currentView = btn.dataset.view;
+      setSegActive(btn);
+      refresh();
+    }
+    if (btn.dataset.range){
+      currentRange = btn.dataset.range;
+      setSegActive(btn);
+      refresh();
+    }
+  });
 
-      if (btn.dataset.view){
-        currentView = btn.dataset.view;
-        setSegActive(btn);
+  const retry = document.getElementById('usageRetry');
+  if (retry) retry.addEventListener('click', refresh);
 
-        if (!last || !last.labels || last.labels.length === 0) {
-          load();  // if nothing cached yet
-        } else {
-          const ci = CI_G_PER_KWH_DEFAULT;
-          const series = (currentView === 'elec')
-            ? last.kwh
-            : last.kwh.map(v => v * (ci/1000));
-          renderChart(last.labels, series, currentView);
-          if (currentView === 'elec') renderMetricsElec(last.total_kwh);
-          else renderMetricsCarbon(last.total_kwh, ci);
-        }
-      }
-
-      if (btn.dataset.range){
-        currentRange = btn.dataset.range;
-        setSegActive(btn);
-        load(); // fetch only when range changes
-      }
-    });
+  // Help popover
+  const elUsageHelpBtn = document.getElementById('usageHelpBtn');
+  const elUsageHelp = document.getElementById('usageHelp');
+  const elUsageHelpClose = document.getElementById('usageHelpClose');
+  let open = false, outside=null, esc=null;
+  function openHelp(){
+    if (open || !elUsageHelp) return;
+    elUsageHelp.classList.remove('hidden');
+    elUsageHelpBtn.setAttribute('aria-expanded','true');
+    open = true;
+    outside = (evt) => { if (!elUsageHelp.contains(evt.target) && evt.target !== elUsageHelpBtn) closeHelp(); };
+    esc = (evt) => { if (evt.key === 'Escape') closeHelp(); };
+    document.addEventListener('mousedown', outside);
+    document.addEventListener('keydown', esc);
   }
-
-  const btnRetry = document.getElementById('usageRetry');
-  if (btnRetry) btnRetry.addEventListener('click', () => load());
-
-  // initial load
-  load();
+  function closeHelp(){
+    if (!open || !elUsageHelp) return;
+    elUsageHelp.classList.add('hidden');
+    elUsageHelpBtn.setAttribute('aria-expanded','false');
+    open = false;
+    document.removeEventListener('mousedown', outside);
+    document.removeEventListener('keydown', esc);
+  }
+  if (elUsageHelpBtn && elUsageHelp && elUsageHelpClose) {
+    elUsageHelpBtn.addEventListener('click', () => open ? closeHelp() : openHelp());
+    elUsageHelpClose.addEventListener('click', closeHelp);
+  }
 })();
   </script>
 
-<script>
+  <!-- Workspace figures script (unchanged) -->
+  <script>
   (() => {
     const $$ = (s) => Array.from(document.querySelectorAll(s));
     const fmt = (n, d=2) => Number(n).toLocaleString(undefined, { minimumFractionDigits:d, maximumFractionDigits:d });
@@ -854,6 +732,5 @@ data-ci="{{ ws.ci|default:220 }}">
   })();
   </script>
   
-
 </body>
 </html>

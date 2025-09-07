@@ -12,6 +12,8 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
+import pandas as pd
+
 import requests
 from django.conf import settings
 from django.http import (
@@ -25,6 +27,9 @@ from django.utils import timezone as dj_tz
 from django.utils.timezone import now as tz_now
 
 from .models import ProjectEnergy, Workspace, InstrumentAverage
+
+import plotly.graph_objects 
+import plotly.io 
 
 # ========= DEBUG PRINT HELPER =========
 def _dbg(enabled: bool, *args) -> None:
@@ -111,51 +116,7 @@ def _util_profile_day(hour: int) -> float:
     base = 0.25 + 0.45 * math.sin((hour - 8) * math.pi / 12)  # peaks around mid-day
     return max(0.05, min(0.95, base))
 
-def _make_series(range_key: str, spec: dict) -> Tuple[List[str], List[float]]:
-    """
-    Build labels + kWh per bin for:
-      - day: 24 hourly bins
-      - month: 30 daily bins (dummy month)
-      - year: 12 monthly bins
-    """
-    rng = _seeded_rng("project-usage")
-    labels: List[str] = []
-    kwh: List[float] = []
 
-    full_watts = (
-        spec["cpu_count"] * spec["cpu_tdp_w"]
-        + spec["gpu_count"] * spec["gpu_tdp_w"]
-        + spec["ram_w"]
-        + spec["other_w"]
-    )
-
-    if range_key == "day":
-        for h in range(24):
-            util = _util_profile_day(h) + rng.uniform(-0.05, 0.05)
-            util = max(0.05, min(0.95, util))
-            watts = full_watts * util
-            kwh.append(round(watts / 1000 * 1.0, 3))
-            labels.append(f"{h:02d}:00")
-    elif range_key == "month":
-        for d in range(1, 31):
-            weekday = (d % 7) not in (6, 0)
-            util = (0.55 if weekday else 0.35) + rng.uniform(-0.08, 0.08)
-            util = max(0.05, min(0.95, util))
-            hours = 8 if weekday else 4
-            kwh.append(round(full_watts / 1000 * hours, 3))
-            labels.append(f"D{d}")
-    elif range_key == "year":
-        for m in range(1, 13):
-            season = 0.6 if m in (2, 3, 10, 11) else 0.5
-            util = season + rng.uniform(-0.07, 0.07)
-            util = max(0.05, min(0.95, util))
-            hours = 8 * 22
-            kwh.append(round(full_watts / 1000 * hours * util, 2))
-            labels.append(["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m-1])
-    else:
-        return [], []
-
-    return labels, kwh
 
 def _stable_specs_for(instrument_name: str) -> dict:
     r = random.Random(instrument_name.lower())
@@ -250,16 +211,20 @@ def home(request: HttpRequest) -> HttpResponse:
     return render(request, "home.html")
 
 def analysis(request: HttpRequest, source: str) -> HttpResponse:
+    """
+    Renders the main analysis page. It fetches workspace data and generates
+    the INITIAL Plotly chart, which defaults to a 24-hour electricity view.
+    """
     source_key = (source or "").lower()
-    rows = Workspace.objects.filter(source=source_key).order_by("-updated_at")[:50]
 
+    # Part 1: Fetch Workspace Data
+    rows = Workspace.objects.filter(source=source_key).order_by("-updated_at")[:50]
     items = []
     now = dj_tz.now()
     for w in rows:
-        # average idle power so the front-end ticker can animate
         started = w.started_at or w.created_at
         elapsed_h = max(1e-6, (now - started).total_seconds() / 3600.0)
-        idle_w = (w.idle_kwh / elapsed_h) * 1000.0
+        idle_w = (w.idle_kwh / elapsed_h) * 1000.0 if elapsed_h > 0 else 0
         ci = int(w.avg_ci_g_per_kwh or 220)
 
         items.append({
@@ -274,6 +239,36 @@ def analysis(request: HttpRequest, source: str) -> HttpResponse:
             "ci":        ci,
         })
 
+    # Part 2: Generate the Initial Plotly Chart
+    plot_div = None
+    try:
+        project_name = PROJECT_TO_LABELVAL.get(source_key)
+        if project_name:
+            df_elec = pd.read_parquet("project_estimated_electricity_usage.parquet")
+            df_project = df_elec[df_elec['project_name'] == project_name].copy()
+            df_project['timestamp'] = pd.to_datetime(df_project['timestamp'])
+            df_project.set_index('timestamp', inplace=True)
+
+            # Default to an hourly view for the last 24 hours
+            df_resampled = df_project.resample('H').sum()
+            kwh_series = (df_resampled['estimated_watt_hours'] / 1000)
+
+            fig = plotly.graph_objects.Figure(data=[plotly.graph_objects.Bar(x=kwh_series.index, y=kwh_series, marker_color='rgba(66,133,244,0.7)')])
+            fig.update_layout(
+                yaxis_title='Energy (kWh)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                margin=dict(l=50, r=20, t=20, b=40)
+            )
+            # `include_plotlyjs='cdn'` is essential for the initial page load to work.
+            plot_div = plotly.io.to_html(fig, full_html=False, include_plotlyjs='cdn')
+
+    except FileNotFoundError:
+        plot_div = "<div class='chart-error'><p>Usage chart data is currently unavailable.</p></div>"
+    except Exception as e:
+        plot_div = f"<div class='chart-error'><p>Could not render the usage chart: {e}</p></div>"
+
+    # Part 3: Prepare Context and Render the Full Page
     context = {
         "source_title": {
             "isis": "ISIS Data Analysis",
@@ -282,9 +277,59 @@ def analysis(request: HttpRequest, source: str) -> HttpResponse:
         }.get(source_key, f"{source.title()} Data Analysis"),
         "source": source_key,
         "workspaces": items,
+        "usage_plot_div": plot_div,
     }
     return render(request, "analysis.html", context)
 
+
+def get_usage_plot(request: HttpRequest, source: str, range_key: str, view_type: str) -> HttpResponse:
+    """
+    Generates and returns ONLY the HTML for the Plotly chart. This view
+    is called by HTMX to dynamically update the chart based on user selection.
+    """
+    plot_div = "<div class='chart-error'><p>Chart data not found.</p></div>"
+    source_key = source.lower()
+    
+    try:
+        project_name = PROJECT_TO_LABELVAL.get(source_key)
+        if project_name:
+            # Step 1: Load the correct Parquet file based on the selected view_type
+            if view_type == 'electricity':
+                df = pd.read_parquet("project_estimated_electricity_usage.parquet")
+                value_col, yaxis_title = 'estimated_watt_hours', 'Energy (kWh)'
+            else: # 'carbon'
+                df = pd.read_parquet("project_carbon_footprint.parquet")
+                value_col, yaxis_title = 'carbon_footprint_gCO2e', 'Emissions (kg CO₂e)'
+
+            # Step 2: Filter and resample data based on the selected range_key
+            df_project = df[df['project_name'] == project_name].copy()
+            df_project['timestamp'] = pd.to_datetime(df_project['timestamp'])
+            df_project.set_index('timestamp', inplace=True)
+
+            resample_rule = {'day': 'H', 'month': 'D', 'year': 'M'}.get(range_key, 'H')
+            df_resampled = df_project.resample(resample_rule).sum()
+            
+            # Convert units (W-h to kW-h, or gCO2e to kgCO2e)
+            series = df_resampled[value_col] / 1000
+
+            # Step 3: Create and configure the Plotly figure
+            fig = plotly.graph_objects.Figure(data=[plotly.graph_objects.Bar(x=series.index, y=series, marker_color='rgba(66,133,244,0.7)')])
+            fig.update_layout(
+                yaxis_title=yaxis_title,
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                margin=dict(l=50, r=20, t=20, b=40)
+            )
+            
+            # Step 4: Convert to HTML. No need to include Plotly.js on these partial updates.
+            plot_div = plotly.io.to_html(fig, full_html=False, include_plotlyjs=False)
+
+    except FileNotFoundError as e:
+        plot_div = f"<div class='chart-error'><p>Data file not found: {e.filename}</p></div>"
+    except Exception as e:
+        plot_div = f"<div class='chart-error'><p>Error rendering chart: {e}</p></div>"
+        
+    return HttpResponse(plot_div)
 
 def instruments(request: HttpRequest, source: str) -> HttpResponse:
     source_key = source.lower()
@@ -403,124 +448,6 @@ def ci_proxy(request: HttpRequest) -> HttpResponse:
             return JsonResponse(payload)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=502)
-
-def project_usage_api(request: HttpRequest) -> HttpResponse:
-    """
-    Return energy series for the project cards.
-
-    Modes (settings.PROM_DATA_MODE):
-      - "db_only": serve cached DB rows only; if not cached -> 503
-      - "prom_on_miss" (default): use DB if fresh; otherwise compute and cache.
-
-    Query params:
-      - range: day|month|year
-      - source: clf|isis|diamond   (others fall back to mock series, no DB)
-      - debug: 1|true
-      - force_refresh: 1|true      (ignored in db_only mode)
-      - Optional overrides:
-          cpu_count, cpu_tdp_w, gpu_count, gpu_tdp_w, ram_w, other_w
-    """
-    mode = getattr(settings, "PROM_DATA_MODE", "prom_on_miss")
-    debug = str(request.GET.get("debug", "")).lower() in ("1", "true", "yes", "on")
-    range_key = (request.GET.get("range") or "day").lower()
-    source = (request.GET.get("source") or "").lower()
-    force_refresh = str(request.GET.get("force_refresh", "")).lower() in ("1", "true", "yes", "on")
-
-    _dbg(debug, "REQUEST", {"mode": mode, "range": range_key, "source": source, "qs": dict(request.GET)})
-
-    if range_key not in ("day", "month", "year"):
-        return HttpResponseBadRequest("range must be day|month|year")
-
-    # build spec (with optional overrides) + hash
-    spec = DEFAULT_TDP_SPEC.copy()
-    for key in ("cpu_count", "cpu_tdp_w", "gpu_count", "gpu_tdp_w", "ram_w", "other_w"):
-        if key in request.GET:
-            try:
-                spec[key] = float(request.GET.get(key))
-            except Exception:
-                pass
-    shash = _spec_hash(spec)
-
-    # DB lookup
-    ttl = _cache_ttl_seconds(range_key)
-    can_cache = source in ("clf", "isis", "diamond")
-    row = (
-        ProjectEnergy.objects.filter(source=source, range_key=range_key, spec_hash=shash)
-        .order_by("-updated_at")
-        .first()
-        if can_cache
-        else None
-    )
-
-    if mode == "db_only":
-        if row:
-            data = {
-                "range": range_key,
-                "labels": row.labels,
-                "kwh": row.kwh,
-                "total_kwh": row.total_kwh,
-                "spec": spec,
-            }
-            _dbg(debug, "RESPONSE(DB_ONLY)", {"id": row.id, "labels_len": len(row.labels), "kwh_len": len(row.kwh)})
-            return JsonResponse(data)
-        msg = (
-            "No cached PromQL data for this (source, range, spec). "
-            "Warm the cache first, e.g.:\n"
-            "  python manage.py refresh_energy_cache --sources clf,isis,diamond --ranges day,month,year"
-        )
-        _dbg(debug, "DB_ONLY_MISS", msg)
-        return JsonResponse({"error": msg}, status=503)
-
-    # Not db_only: use cache if fresh and not force_refresh
-    if row and not force_refresh:
-        age_s = (tz_now() - row.updated_at).total_seconds()
-        _dbg(debug, "CACHE_HIT", {"id": row.id, "age_s": int(age_s), "ttl_s": ttl})
-        if age_s < ttl:
-            data = {
-                "range": range_key,
-                "labels": row.labels,
-                "kwh": row.kwh,
-                "total_kwh": row.total_kwh,
-                "spec": spec,
-            }
-            _dbg(debug, "RESPONSE(DB)", {"labels_len": len(row.labels), "kwh_len": len(row.kwh)})
-            return JsonResponse(data)
-
-    # compute (prom -> fallback to mock)
-    try:
-        if source in PROJECT_TO_LABELVAL:
-            labels, kwh = _prometheus_usage_series(source, range_key, spec, debug)
-        else:
-            _dbg(debug, "FALLBACK_MOCK_SERIES")
-            labels, kwh = _make_series(range_key, spec)
-    except Exception as e:
-        _dbg(debug, "COMPUTE_ERROR", repr(e))
-        labels, kwh = _make_series(range_key, spec)
-
-    total_kwh = round(sum(kwh), 3)
-
-    # best-effort cache
-    if can_cache:
-        try:
-            s, e, step_s = _bin_meta(range_key)
-            ProjectEnergy.objects.create(
-                source=source,
-                range_key=range_key,
-                spec_hash=shash,
-                spec_json=spec,
-                labels=labels,
-                kwh=kwh,
-                total_kwh=total_kwh,
-                start_unix=s,
-                end_unix=e,
-                step_seconds=step_s,
-            )
-        except Exception as db_e:
-            _dbg(debug, "CACHE_SAVE_ERR", repr(db_e))
-
-    return JsonResponse(
-        {"range": range_key, "labels": labels, "kwh": kwh, "total_kwh": total_kwh, "spec": spec}
-    )
 
 def sci_score_api(request: HttpRequest) -> HttpResponse:
     """
@@ -642,147 +569,8 @@ def _sci_series(range_key: str, spec: dict, ci_gpkwh: float = DEFAULT_CI_G_PER_K
     avg = sum(vals) / len(vals) if vals else 0.0
     return labels, vals, avg, op, emb
 
-# -----------------------------
-# Prometheus-backed energy (CPU + dynamic RAM)
-# -----------------------------
-def _prom_api_base(debug: bool = False) -> str:
-    base = getattr(settings, "PROMETHEUS_URL", "").rstrip("/")
-    api = base + "/api/v1"
-    _dbg(debug, "PROM_BASE", api)
-    return api
-
-def _prom_query_range(expr: str, start: int, end: int, step: str, debug: bool = False) -> dict:
-    url = _prom_api_base(debug) + "/query_range"
-    _dbg(debug, "Q_RANGE", {"expr": expr, "start": start, "end": end, "step": step})
-    try:
-        r = requests.get(
-            url,
-            params={"query": expr, "start": start, "end": end, "step": step},
-            timeout=60,
-            verify=False,  # dev-only instance; leave False if self-signed
-        )
-        r.raise_for_status()
-        out = r.json()
-        series = len(out.get("data", {}).get("result", []))
-        _dbg(debug, "Q_RANGE_OK", {"series": series, "status": out.get("status")})
-        return out
-    except Exception as e:
-        _dbg(debug, "Q_RANGE_ERR", repr(e))
-        raise
-
-def _parse_step_seconds(step: str) -> int:
-    """
-    Parse a Prom step like '3600s' -> 3600.
-    Falls back to 60s if parsing fails.
-    """
-    try:
-        if step.endswith("s"):
-            return int(float(step[:-1]))
-    except Exception:
-        pass
-    return 60
-
-def _prom_query_range_chunked(
-    expr: str,
-    start: int,
-    end: int,
-    step: str,
-    *,
-    chunk_days: int | None = None,
-    debug: bool = False,
-) -> Dict[int, float]:
-    """
-    Query Prometheus in smaller windows and stitch the results together.
-    Returns a {timestamp -> value} map (like _ts_map_from_matrix).
-
-    - Overlaps by one 'step' between chunks (never on the final chunk).
-    - Retries each chunk request up to PROM_CHUNK_RETRIES times,
-      sleeping PROM_CHUNK_RETRY_SLEEP_S seconds between attempts.
-    """
-    if chunk_days is None:
-        chunk_days = int(getattr(settings, "PROM_CHUNK_DAYS", 1) or 1)
-
-    chunk_sec = max(1, int(chunk_days) * 86400)
-    step_s = _parse_step_seconds(step)
-    if step_s <= 0:
-        step_s = 60  # sane fallback
-
-    retries = int(getattr(settings, "PROM_CHUNK_RETRIES", 5) or 5)
-    sleep_s = int(getattr(settings, "PROM_CHUNK_RETRY_SLEEP_S", 15) or 15)
-
-    acc: Dict[int, float] = {}
-    cur = start
-    n_chunks = 0
-
-    while cur < end:
-        sub_end = min(end, cur + chunk_sec)
-
-        # --- retry loop for this chunk ---
-        attempt = 1
-        while True:
-            try:
-                mat = _prom_query_range(expr, cur, sub_end, step, debug)
-                sub_ts = _ts_map_from_matrix(mat, debug, f"chunk {n_chunks}:{cur}->{sub_end}")
-
-                # Merge without double-counting (boundaries may overlap by one step)
-                for ts, v in sub_ts.items():
-                    if ts not in acc:
-                        acc[ts] = v
-
-                n_chunks += 1
-                break  # success for this chunk
-            except Exception as e:
-                _dbg(debug, "Q_RANGE_RETRY",
-                     {"chunk": n_chunks, "from": cur, "to": sub_end, "attempt": attempt, "err": repr(e)})
-                if attempt >= retries:
-                    _dbg(debug, "Q_RANGE_CHUNK_ERR_FINAL",
-                         {"chunk": n_chunks, "from": cur, "to": sub_end, "attempts": attempt})
-                    raise
-                # Wait then try again
-                _dbg(debug, "Q_RANGE_RETRY_SLEEP", {"seconds": sleep_s})
-                time.sleep(sleep_s)
-                attempt += 1
-        # --- end retry loop ---
-
-        # If we just did the final chunk, stop.
-        if sub_end >= end:
-            break
-
-        # Otherwise, overlap by one step to keep continuity.
-        next_cur = sub_end - step_s
-
-        # Safety: always make forward progress even if step_s >= chunk_sec.
-        if next_cur <= cur:
-            next_cur = sub_end
-
-        cur = next_cur
-
-    _dbg(debug, "Q_RANGE_CHUNKED_OK", {"chunks": n_chunks, "points": len(acc)})
-    return acc
 
 
-
-
-
-def _ts_map_from_matrix(result_obj: dict, debug: bool = False, tag: str = "") -> Dict[int, float]:
-    """Sum all series into {timestamp->sum(value)}, skipping bad points."""
-    series = (result_obj or {}).get("data", {}).get("result", []) or []
-    acc: Dict[int, float] = {}
-    for s in series:
-        for item in (s.get("values") or []):
-            if not isinstance(item, (list, tuple)) or len(item) < 2:
-                continue
-            ts, val = item[0], item[1]
-            try:
-                ts_i = int(float(ts))
-                v = float(val)
-                if not math.isfinite(v):
-                    continue
-            except Exception:
-                continue
-            acc[ts_i] = acc.get(ts_i, 0.0) + v
-    _dbg(debug, f"TS_MAP[{tag}]", {"points": len(acc)})
-    return acc
 
 def _bin_setup(range_key: str, debug: bool = False):
     now = int(time.time())
@@ -807,46 +595,6 @@ def _bin_setup(range_key: str, debug: bool = False):
     _dbg(debug, "BIN_SETUP", {"range": range_key, "start": start, "end": now, "step_s": step_s, "bins": bins})
     return start, now, step_s, labels, ts_to_bin, bins
 
-def _prometheus_usage_series(source_key: str, range_key: str, spec: dict, debug: bool = False):
-    label_val = PROJECT_TO_LABELVAL.get(source_key.lower())
-    if not label_val:
-        raise ValueError("Unknown source; expected clf|isis|diamond")
-    _dbg(debug, "SOURCE", {"source": source_key, "label_val": label_val})
-
-    start, end, step_s, labels, ts_to_bin, n_bins = _bin_setup(range_key, debug)
-    step_str = f"{step_s}s"
-    rate_win = {"day": "5m", "month": "30m", "year": "1h"}[range_key]
-    _dbg(debug, "RATE_WIN", rate_win)
-
-    expr_util  = f'avg by (instance) (1 - rate(node_cpu_seconds_total{{mode="idle",cloud_project_name="{label_val}"}}[{rate_win}]))'
-    expr_cores = f'count(count by (instance, cpu) (node_cpu_seconds_total{{cloud_project_name="{label_val}"}})) by (instance)'
-    expr_cpu_rich = f'sum( ({expr_util}) * on(instance) group_left() ({expr_cores}) ) * {spec["cpu_tdp_w"]}'
-    _dbg(debug, "EXPR_CPU", expr_cpu_rich)
-
-    cpu_ts = _prom_query_range_chunked(
-        expr_cpu_rich, start, end, step_str,
-        chunk_days=getattr(settings, "PROM_CHUNK_DAYS", 1),
-        debug=debug,
-    )
-
-    expr_ram = f'sum( node_memory_Active_bytes{{cloud_project_name="{label_val}"}} / node_memory_MemTotal_bytes{{cloud_project_name="{label_val}"}} ) * {spec["ram_w"]}'
-    _dbg(debug, "EXPR_RAM", expr_ram)
-    ram_ts = _prom_query_range_chunked(
-        expr_ram, start, end, step_str,
-        chunk_days=getattr(settings, "PROM_CHUNK_DAYS", 1),
-        debug=debug,
-    )
-    kwh_bins = [0.0] * n_bins
-    all_ts = sorted(set(cpu_ts.keys()) | set(ram_ts.keys()))
-    for ts in all_ts:
-        watts = cpu_ts.get(ts, 0.0) + ram_ts.get(ts, 0.0)
-        idx = ts_to_bin(ts)
-        if 0 <= idx < n_bins:
-            kwh_bins[idx] += (watts / 1000.0) * (step_s / 3600.0)
-
-    _dbg(debug, "BINS_SAMPLE", {"first_5": [round(v, 3) for v in kwh_bins[:5]], "n_bins": n_bins})
-    _dbg(debug, "TOTAL_KWH", round(sum(kwh_bins), 3))
-    return labels, [round(v, 3) for v in kwh_bins]
 
 # -----------------------------
 # Per-workspace estimates
