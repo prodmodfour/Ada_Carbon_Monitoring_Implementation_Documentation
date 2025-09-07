@@ -92,14 +92,11 @@ class Command(BaseCommand):
                 current_datetime += datetime.timedelta(hours=1)
                 continue 
 
-            start_time = current_datetime.isoformat()
-            end_time = current_datetime + datetime.timedelta(hours=1)
-            end_time = end_time.isoformat()
 
             parameters = {
             "query": query,
-            "start": start_time,
-            "end": end_time,
+            "start": current_datetime.isoformat(),
+            "end": current_datetime.isoformat(),
             "step": step,
             }
 
