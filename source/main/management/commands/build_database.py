@@ -78,12 +78,17 @@ class Command(BaseCommand):
             except Exception as e:
                 print(f"Warning: Could not read existing parquet file at '{parquet_file_path}'. Error: {e}")
 
+        skipped_entries = 0
+        total_entries = 0
+        failed_entries = 0
         while current_datetime < end_datetime:
+            total_entries += 1
             print(f"Current datetime: {current_datetime}")
             # Make current_datetime timezone-naive for comparison
             naive_current_datetime = current_datetime.replace(tzinfo=None)
             if naive_current_datetime in existing_timestamps:
                 print(f"Data for {current_datetime} already exists. Skipping.")
+                skipped_entries += 1
                 current_datetime += datetime.timedelta(hours=1)
                 continue 
 
@@ -98,18 +103,24 @@ class Command(BaseCommand):
             "step": step,
             }
 
-            # Make the request
-            response = requests.get(url, params=parameters, timeout=timeout)
 
-            print("URL:", response.url)
-            print("Status:", response.status_code, response.reason)
 
             try:
+                # Make the request
+                response = requests.get(url, params=parameters, timeout=timeout)
+
+                print("URL:", response.url)
+                print("Status:", response.status_code, response.reason)
                 response.raise_for_status()  # raises on 4xx/5xx
                 print("OK → proceeding to parse JSON")
                 data = response.json()
                 print("Prometheus status:", data.get("status"))
 
+            except requests.exceptions.ReadTimeout:
+                print(f"Request timed out for chunk starting at {current_datetime}. Skipping.")
+                failed_entries += 1
+                current_datetime += datetime.timedelta(hours=1)
+                continue
             except requests.HTTPError as e:
                 print("HTTPError:", e)  
 
@@ -156,7 +167,10 @@ class Command(BaseCommand):
             # Progress the current datetime
             current_datetime += datetime.timedelta(hours=1)
 
-
+        print(f"Skipped {skipped_entries} entries.")
+        print(f"Failed {failed_entries} entries.")
+        print(f"Total entries: {total_entries}.")
+        print(f"Completion percentage: {((total_entries - skipped_entries - failed_entries) / total_entries) * 100}%.")
 
         if parquet_writer:
             parquet_writer.close()
