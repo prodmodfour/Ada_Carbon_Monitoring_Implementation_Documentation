@@ -87,7 +87,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# --- Project-specific knobs (kept inline for dev) ----------------------------
+
 PROMETHEUS_URL = "https://host-172-16-100-248.nubes.stfc.ac.uk/"
 PROM_DATA_MODE = "prom_on_miss"
 # Day by day recommended, the prometheus server tends to time out on larger requests
