@@ -78,6 +78,7 @@ class Command(BaseCommand):
             except Exception as e:
                 print(f"Warning: Could not read existing parquet file at '{parquet_file_path}'. Error: {e}")
 
+
         skipped_entries = 0
         total_entries = 0
         failed_entries = 0
@@ -92,15 +93,12 @@ class Command(BaseCommand):
                 current_datetime += datetime.timedelta(hours=1)
                 continue 
 
-
             parameters = {
             "query": query,
             "start": current_datetime.isoformat(),
             "end": current_datetime.isoformat(),
             "step": step,
             }
-
-
 
             try:
                 # Make the request
@@ -114,7 +112,7 @@ class Command(BaseCommand):
                 print("Prometheus status:", data.get("status"))
 
             except requests.exceptions.ReadTimeout:
-                print(f"Request timed out for chunk starting at {current_datetime}. Skipping.")
+                print(f"Request timed out for entry at {current_datetime}. Skipping.")
                 failed_entries += 1
                 current_datetime += datetime.timedelta(hours=1)
                 continue
