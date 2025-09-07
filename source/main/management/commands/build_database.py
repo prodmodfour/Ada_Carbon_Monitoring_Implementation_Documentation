@@ -13,23 +13,7 @@ class Command(BaseCommand):
 
     def handle(self, *arguments, **options):
         print("Building the database from the prometheus server.")
-        # I am using python. I want to download data from a prometheus database and store it in Redis. 
-        # The time series in question is called node_cpu_seconds_total.
-        # It has the following labels: 
-        # cloud_project_name (CDAaaS, IDAaaS, DDAaaS)
-        # cpu
-        # instance
-        # job
-        # machine_name
-        # machine_type_id
-        # mode
-        # state
-        # tag
 
-        # I want to download all of the data in a date range. I want the meta data, the labels, intact and properly attached.
-        # default range would be Jan 1 2024 to present day
-        # Expect the prometheus server to give 5xx series or 4xx series errors. We should keep the data we have on our first run attempt to copy. 
-        # We should fill in gaps in future run attempts.
 
         # Prometheus server variables
         PROMETHEUS_URL = ada_project.settings.PROMETHEUS_URL
@@ -78,7 +62,9 @@ class Command(BaseCommand):
             except Exception as e:
                 print(f"Warning: Could not read existing parquet file at '{parquet_file_path}'. Error: {e}")
 
-
+        # ---------------------
+        # Main loop
+        # ---------------------
         skipped_entries = 0
         total_entries = 0
         failed_entries = 0
@@ -117,11 +103,15 @@ class Command(BaseCommand):
                 current_datetime += datetime.timedelta(hours=1)
                 continue
             except requests.HTTPError as e:
-                print("HTTPError:", e)  
-
-                body = e.response.text if e.response is not None else ""
-                print("Response body (first 500 chars):")
-                print(body[:500])
+                print(f"HTTPError for entry at {current_datetime}. Skipping.")
+                failed_entries += 1
+                current_datetime += datetime.timedelta(hours=1)
+                continue
+            except requests.exceptions.RequestException as e:
+                print(f"RequestException for entry at {current_datetime}. Skipping.")
+                failed_entries += 1
+                current_datetime += datetime.timedelta(hours=1)
+                continue
 
             # Write to Parquet database
             if data.get("status") == "success" and data.get("data", {}).get("result"):
