@@ -295,19 +295,31 @@ def analysis(request: HttpRequest, source: str) -> HttpResponse:
         plot_div = plotly.io.to_html(
             fig, full_html=False, include_plotlyjs='cdn', config={'responsive': True},
         )
-        plot_div += f"""
+        # Build the JS args safely via JSON (nulls become null, strings are quoted/escaped)
+        js_args = json.dumps([
+            "electricity",          # view
+            total_val,              # total
+            avg_val,                # avg
+            bins_len,               # bins
+            None if max_val is None else max_val,
+            max_lab,
+            None if min_val is None else min_val,
+            min_lab,
+        ])
+
+        plot_div += """
         <script>
-        if (window.updateUsageMetrics) {{
-        window.updateUsageMetrics("electricity",
-            {total_val:.6f}, {avg_val:.6f}, {bins_len},
-            {('null' if max_val is None else f'{max_val:.6f}')},
-            "{max_lab}",
-            {('null' if min_val is None else f'{min_val:.6f}')},
-            "{min_lab}"
-        );
-        }}
+        (function(){
+        const args = %s;
+        if (window.updateUsageMetrics) {
+            window.updateUsageMetrics.apply(null, args);
+        } else {
+            window.__usageInitQueue = window.__usageInitQueue || [];
+            window.__usageInitQueue.push(args);
+        }
+        })();
         </script>
-        """
+        """ % js_args
 
     except FileNotFoundError:
         plot_div = "<div class='chart-error'><p>Usage chart data is currently unavailable.</p></div>"
@@ -409,19 +421,31 @@ def get_usage_plot(request: HttpRequest, source: str, range_key: str, view_type:
 
         # Append a tiny inline script to update the sidebar metrics
         # view_type is either 'electricity' (kWh) or 'carbon' (kg CO2e)
-        plot_div += f"""
+        js_args = json.dumps([
+            view_type,              # "electricity" | "carbon"
+            total_val,
+            avg_val,
+            bins_len,
+            None if max_val is None else max_val,
+            max_lab,
+            None if min_val is None else min_val,
+            min_lab,
+        ])
+
+        plot_div += """
         <script>
-        if (window.updateUsageMetrics) {{
-        window.updateUsageMetrics("{view_type}",
-            {total_val:.6f}, {avg_val:.6f}, {bins_len},
-            {('null' if max_val is None else f'{max_val:.6f}')},
-            "{max_lab}",
-            {('null' if min_val is None else f'{min_val:.6f}')},
-            "{min_lab}"
-        );
-        }}
+        (function(){
+        const args = %s;
+        if (window.updateUsageMetrics) {
+            window.updateUsageMetrics.apply(null, args);
+        } else {
+            window.__usageInitQueue = window.__usageInitQueue || [];
+            window.__usageInitQueue.push(args);
+        }
+        })();
         </script>
-"""
+        """ % js_args
+
     except FileNotFoundError as e:
         plot_div = f"<div class='chart-error'><p>Data file not found: {e.filename}</p></div>"
     except Exception as e:

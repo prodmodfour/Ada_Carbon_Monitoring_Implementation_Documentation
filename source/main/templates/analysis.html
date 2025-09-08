@@ -678,7 +678,8 @@
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const html = await resp.text();
       plot.innerHTML = html;
-  +   runInlineScripts(plot); // ensure Plotly’s inline script executes
+    
+      runInlineScripts(plot); // ensure Plotly’s inline script executes
       // Plotly JS is already included in initial div via CDN; the partials do not include it again.
     }catch(e){
       if (errMsg) errMsg.textContent = `Unable to load usage (${e.message}).`;
@@ -838,6 +839,15 @@
       if (view === 'electricity') updateElectricity(total, avg);
       if (view === 'carbon')      updateCarbon(total,   avg);
     };
+
+    
+    // Drain any queued initializations that ran before this script loaded:
+    if (Array.isArray(window.__usageInitQueue) && window.__usageInitQueue.length) {
+      for (const args of window.__usageInitQueue) {
+        try { window.updateUsageMetrics.apply(null, args); } catch (e) { /* no-op */ }
+      }
+      window.__usageInitQueue = [];
+    }
   })();
   </script>
 
