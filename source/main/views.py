@@ -262,16 +262,52 @@ def analysis(request: HttpRequest, source: str) -> HttpResponse:
             
 
 
-            fig = plotly.graph_objects.Figure(data=[plotly.graph_objects.Bar(x=kwh_series.index, y=kwh_series, marker_color='rgba(66,133,244,0.7)')])
-            fig.update_layout(
-                yaxis_title='Energy (kWh)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                margin=dict(l=50, r=20, t=20, b=40),
-                height=320
-            )
-            # `include_plotlyjs='cdn'` is essential for the initial page load to work.
-            plot_div = plotly.io.to_html(fig, full_html=False, include_plotlyjs='cdn', config={'responsive': True},)
+        fig = plotly.graph_objects.Figure(
+            data=[plotly.graph_objects.Bar(x=kwh_series.index, y=kwh_series, marker_color='rgba(66,133,244,0.7)')]
+        )
+        fig.update_layout(
+            yaxis_title='Energy (kWh)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            margin=dict(l=50, r=20, t=20, b=40),
+            height=320
+        )
+
+        # Basic stats for the aside (electricity)
+        total_val = float(kwh_series.sum())
+        avg_val   = float(kwh_series.mean()) if len(kwh_series) else 0.0
+        bins_len  = int(len(kwh_series))
+        if bins_len:
+            max_idx = int(kwh_series.astype(float).idxmax().value // 10**9)  # seconds since epoch (UTC)
+            min_idx = int(kwh_series.astype(float).idxmin().value // 10**9)
+            max_ts  = kwh_series.idxmax()
+            min_ts  = kwh_series.idxmin()
+            max_val = float(kwh_series.max())
+            min_val = float(kwh_series.min())
+            # Labels as local-friendly strings
+            max_lab = max_ts.tz_convert('Europe/London').strftime('%Y-%m-%d %H:%M')
+            min_lab = min_ts.tz_convert('Europe/London').strftime('%Y-%m-%d %H:%M')
+        else:
+            max_val = min_val = None
+            max_lab = min_lab = ""
+
+        # Plot HTML + initial sidebar update
+        plot_div = plotly.io.to_html(
+            fig, full_html=False, include_plotlyjs='cdn', config={'responsive': True},
+        )
+        plot_div += f"""
+        <script>
+        if (window.updateUsageMetrics) {{
+        window.updateUsageMetrics("electricity",
+            {total_val:.6f}, {avg_val:.6f}, {bins_len},
+            {('null' if max_val is None else f'{max_val:.6f}')},
+            "{max_lab}",
+            {('null' if min_val is None else f'{min_val:.6f}')},
+            "{min_lab}"
+        );
+        }}
+        </script>
+        """
 
     except FileNotFoundError:
         plot_div = "<div class='chart-error'><p>Usage chart data is currently unavailable.</p></div>"
@@ -342,6 +378,18 @@ def get_usage_plot(request: HttpRequest, source: str, range_key: str, view_type:
         avg_val   = float(series.mean())
         bins_len  = int(len(series))
 
+        # Extrema for sidebar
+        if bins_len:
+            max_ts  = series.idxmax()
+            min_ts  = series.idxmin()
+            max_val = float(series.max())
+            min_val = float(series.min())
+            max_lab = max_ts.tz_convert('Europe/London').strftime('%Y-%m-%d %H:%M')
+            min_lab = min_ts.tz_convert('Europe/London').strftime('%Y-%m-%d %H:%M')
+        else:
+            max_val = min_val = None
+            max_lab = min_lab = ""
+
         # Step 3: Create and configure the Plotly figure
         fig = plotly.graph_objects.Figure(
             data=[plotly.graph_objects.Bar(x=series.index, y=series, marker_color='rgba(66,133,244,0.7)')]
@@ -364,10 +412,16 @@ def get_usage_plot(request: HttpRequest, source: str, range_key: str, view_type:
         plot_div += f"""
         <script>
         if (window.updateUsageMetrics) {{
-            window.updateUsageMetrics("{view_type}", {total_val:.6f}, {avg_val:.6f}, {bins_len});
+        window.updateUsageMetrics("{view_type}",
+            {total_val:.6f}, {avg_val:.6f}, {bins_len},
+            {('null' if max_val is None else f'{max_val:.6f}')},
+            "{max_lab}",
+            {('null' if min_val is None else f'{min_val:.6f}')},
+            "{min_lab}"
+        );
         }}
         </script>
-        """
+"""
     except FileNotFoundError as e:
         plot_div = f"<div class='chart-error'><p>Data file not found: {e.filename}</p></div>"
     except Exception as e:

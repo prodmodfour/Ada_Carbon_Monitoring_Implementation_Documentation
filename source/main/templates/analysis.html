@@ -156,38 +156,38 @@
             {{ usage_plot_div|safe }}
           </div>
           <aside class="usage-metrics">
-            <!-- ELECTRICITY -->
             <div class="metric-card">
-              <div class="metric-title">For electricity</div>
-              <div class="metric-subtitle">Electricity equivalency</div>
+              <div class="metric-title" id="summaryTitle">Electricity summary</div>
+          
+              <div class="metric-subtitle">Totals</div>
               <ul class="metric-list">
-                <li><strong id="elecTotalKwh">–</strong> total</li>
+                <li><strong id="sumTotal">–</strong> <span id="sumUnit">kWh</span> total</li>
+                <li>Average per bin: <strong id="sumAvgPerBin">–</strong></li>
+                <li>Bins shown: <strong id="sumBins">–</strong></li>
+              </ul>
+          
+              <div class="metric-subtitle" style="margin-top:.5rem;">Distribution</div>
+              <ul class="metric-list">
+                <li>Peak bin: <strong id="sumPeakVal">–</strong> at <span id="sumPeakLabel">–</span></li>
+                <li>Lowest bin: <strong id="sumMinVal">–</strong> at <span id="sumMinLabel">–</span></li>
+              </ul>
+          
+              <div class="metric-subtitle" style="margin-top:.5rem;">Equivalencies</div>
+          
+              <!-- Electricity equivalencies -->
+              <ul class="metric-list" id="eqElectricity">
+                <li id="eqElecTotal"><strong>–</strong> total</li>
                 <li id="bulbHours">≈ – light-bulb hours (60W)</li>
                 <li id="laptopHours">≈ – laptop hours (65W)</li>
                 <li id="kettleBoils">≈ – kettle boils (0.11 kWh/boil)</li>
               </ul>
           
-              <div class="metric-subtitle" style="margin-top:.5rem;">Totals</div>
-              <ul class="metric-list">
-                <li>Average per bin: <strong id="elecAvgPerBin">–</strong> kWh</li>
-              </ul>
-            </div>
-          
-            <!-- CARBON -->
-            <div class="metric-card">
-              <div class="metric-title">For carbon</div>
-              <div class="metric-subtitle">Carbon equivalency</div>
-              <ul class="metric-list">
+              <!-- Carbon equivalencies -->
+              <ul class="metric-list" id="eqCarbon" style="display:none;">
                 <li><strong id="carbonTotalKg">–</strong> total (kg CO₂e)</li>
                 <li id="treeYears">≈ – tree-years</li>
                 <li id="carKm">≈ – car km</li>
                 <li id="flightPct">≈ – of a Paris→Dubai flight</li>
-              </ul>
-          
-              <div class="metric-subtitle" style="margin-top:.5rem;">Totals</div>
-              <ul class="metric-list">
-                <li>Total carbon: <strong id="carbonTotalLabel">–</strong></li>
-                <li>Average per bin: <strong id="carbonAvgPerBin">–</strong> kg CO₂e</li>
               </ul>
           
               <div class="metric-footnote" style="font-size:.85em;opacity:.75;margin-top:.25rem;">
@@ -741,66 +741,111 @@
 <script>
   (() => {
     // Constants for equivalencies (tweak as needed)
-    const W_BULB = 60;        // 60W bulb
-    const W_LAPTOP = 65;      // 65W laptop
-    const KETTLE_KWH = 0.11;  // per boil
-    const TREE_KG_PER_YEAR = 21;     // kg CO2e sequestered per tree-year (approx)
-    const CAR_KG_PER_KM = 0.12;      // average car emissions per km (kg CO2e)
-    const FLIGHT_KG = 600;           // Paris→Dubai, one-way, economy (kg CO2e, approx)
+    const W_BULB = 60;
+    const W_LAPTOP = 65;
+    const KETTLE_KWH = 0.11;
+    const TREE_KG_PER_YEAR = 21;
+    const CAR_KG_PER_KM = 0.12;
+    const FLIGHT_KG = 600;
   
     const $ = (s) => document.querySelector(s);
     const fmt = (n, d=2) => Number(n).toLocaleString(undefined, {minimumFractionDigits:d, maximumFractionDigits:d});
     const fmtInt = (n) => Math.round(n).toLocaleString();
   
+    function setSummaryHeader(view){
+      const title = $('#summaryTitle');
+      const unit  = $('#sumUnit');
+      if (!title || !unit) return;
+      if (view === 'carbon'){
+        title.textContent = 'Carbon summary';
+        unit.textContent = 'kg CO₂e';
+      } else {
+        title.textContent = 'Electricity summary';
+        unit.textContent = 'kWh';
+      }
+    }
+  
+    function setSummaryTotals(view, total, avg, bins){
+      const totalEl = $('#sumTotal');
+      const avgEl   = $('#sumAvgPerBin');
+      const binsEl  = $('#sumBins');
+      if (totalEl) totalEl.textContent = fmt(total, view === 'carbon' ? 2 : 2);
+      if (avgEl)   avgEl.textContent   = fmt(avg,   view === 'carbon' ? 2 : 2);
+      if (binsEl)  binsEl.textContent  = String(bins ?? '–');
+    }
+  
+    function setSummaryExtrema(view, maxVal, maxLabel, minVal, minLabel){
+      const pVal = $('#sumPeakVal'), pLab = $('#sumPeakLabel');
+      const mVal = $('#sumMinVal'),  mLab = $('#sumMinLabel');
+      const dps  = view === 'carbon' ? 2 : 2;
+      if (pVal) pVal.textContent = (maxVal == null) ? '–' : fmt(maxVal, dps);
+      if (mVal) mVal.textContent = (minVal == null) ? '–' : fmt(minVal, dps);
+      if (pLab) pLab.textContent = maxLabel || '–';
+      if (mLab) mLab.textContent = minLabel || '–';
+    }
+  
+    function showEquivalencies(view){
+      const eqE = $('#eqElectricity');
+      const eqC = $('#eqCarbon');
+      if (!eqE || !eqC) return;
+      if (view === 'carbon'){
+        eqE.style.display = 'none';
+        eqC.style.display = '';
+      } else {
+        eqE.style.display = '';
+        eqC.style.display = 'none';
+      }
+    }
+  
+    // Electricity equivalents
     function updateElectricity(totalKwh, avgKwh) {
       const bulbH   = (totalKwh / (W_BULB/1000));
       const laptopH = (totalKwh / (W_LAPTOP/1000));
       const boils   = (totalKwh / KETTLE_KWH);
   
-      const elTotal = $('#elecTotalKwh');
-      const elAvg   = $('#elecAvgPerBin');
+      const elTotal = $('#eqElecTotal');
+      if (elTotal) elTotal.innerHTML = `<strong>${fmt(totalKwh, 2)} kWh</strong> total`;
+  
       const elBulb  = $('#bulbHours');
       const elLap   = $('#laptopHours');
       const elKet   = $('#kettleBoils');
   
-      if (elTotal) elTotal.textContent = `${fmt(totalKwh, 2)} kWh`;
-      if (elAvg)   elAvg.textContent   = fmt(avgKwh, 2);
-      if (elBulb)  elBulb.textContent  = `≈ ${fmtInt(bulbH)} light-bulb hours (60W)`;
-      if (elLap)   elLap.textContent   = `≈ ${fmtInt(laptopH)} laptop hours (65W)`;
-      if (elKet)   elKet.textContent   = `≈ ${fmtInt(boils)} kettle boils (0.11 kWh/boil)`;
+      if (elBulb) elBulb.textContent = `≈ ${fmtInt(bulbH)} light-bulb hours (60W)`;
+      if (elLap)  elLap.textContent  = `≈ ${fmtInt(laptopH)} laptop hours (65W)`;
+      if (elKet)  elKet.textContent  = `≈ ${fmtInt(boils)} kettle boils (0.11 kWh/boil)`;
     }
   
+    // Carbon equivalents
     function updateCarbon(totalKg, avgKg) {
       const treeYears = totalKg / TREE_KG_PER_YEAR;
       const carKm     = totalKg / CAR_KG_PER_KM;
       const flightPct = (totalKg / FLIGHT_KG) * 100;
   
       const elTotal      = $('#carbonTotalKg');
-      const elTotalLbl   = $('#carbonTotalLabel');
-      const elAvg        = $('#carbonAvgPerBin');
       const elTrees      = $('#treeYears');
       const elCarKm      = $('#carKm');
       const elFlightPct  = $('#flightPct');
   
       if (elTotal)    elTotal.textContent    = fmt(totalKg, 2);
-      if (elTotalLbl) elTotalLbl.textContent = `${fmt(totalKg, 2)} kg CO₂e`;
-      if (elAvg)      elAvg.textContent      = fmt(avgKg, 2);
-      if (elTrees)    elTrees.textContent    = `≈ ${fmt(totalKg < TREE_KG_PER_YEAR ? treeYears.toFixed(2) : fmt(treeYears, 2))} tree-years`;
+      if (elTrees)    elTrees.textContent    = `≈ ${totalKg < TREE_KG_PER_YEAR ? treeYears.toFixed(2) : fmt(treeYears, 2)} tree-years`;
       if (elCarKm)    elCarKm.textContent    = `≈ ${fmtInt(carKm)} car km`;
       if (elFlightPct)elFlightPct.textContent= `≈ ${flightPct < 1 ? flightPct.toFixed(2) : fmt(flightPct, 1)}% of a Paris→Dubai flight`;
     }
   
-    // Expose to plot HTML snippets:
-    window.updateUsageMetrics = function(view, total, avg, bins){
-      if (view === 'electricity') {
-        updateElectricity(total, avg);
-        // When switching off carbon view, keep last carbon values until carbon view is requested.
-      } else if (view === 'carbon') {
-        updateCarbon(total, avg);
-      }
+    // New: a single entrypoint that also accepts extrema + unit info.
+    // Signature: (view, total, avg, bins, maxVal, maxLabel, minVal, minLabel)
+    window.updateUsageMetrics = function(view, total, avg, bins, maxVal, maxLabel, minVal, minLabel){
+      setSummaryHeader(view);
+      setSummaryTotals(view, total, avg, bins);
+      setSummaryExtrema(view, maxVal, maxLabel, minVal, minLabel);
+      showEquivalencies(view);
+  
+      if (view === 'electricity') updateElectricity(total, avg);
+      if (view === 'carbon')      updateCarbon(total,   avg);
     };
   })();
   </script>
+  
   <!-- Workspace figures script (unchanged) -->
   <script>
   (() => {
