@@ -259,6 +259,8 @@ def analysis(request: HttpRequest, source: str) -> HttpResponse:
                 .resample('H').sum() / 1000.0
             )
 
+            
+
 
             fig = plotly.graph_objects.Figure(data=[plotly.graph_objects.Bar(x=kwh_series.index, y=kwh_series, marker_color='rgba(66,133,244,0.7)')])
             fig.update_layout(
@@ -333,24 +335,39 @@ def get_usage_plot(request: HttpRequest, source: str, range_key: str, view_type:
 )
             # -----------------------------------------------------------------
 
-            if series.empty:
-                return HttpResponse("<div class='chart-error'><p>No data in selected range.</p></div>")
+        if series.empty:
+            return HttpResponse("<div class='chart-error'><p>No data in selected range.</p></div>")
 
-            # Step 3: Create and configure the Plotly figure
-            fig = plotly.graph_objects.Figure(
-                data=[plotly.graph_objects.Bar(x=series.index, y=series, marker_color='rgba(66,133,244,0.7)')]
-            )
-            fig.update_layout(
-                yaxis_title=yaxis_title,
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                margin=dict(l=50, r=20, t=20, b=40),
-                height=320
-            )
+        total_val = float(series.sum())
+        avg_val   = float(series.mean())
+        bins_len  = int(len(series))
 
-            # Step 4: Convert to HTML. No need to include Plotly.js on these partial updates.
-            plot_div = plotly.io.to_html(fig, full_html=False, include_plotlyjs=False, config={'responsive': True},)
+        # Step 3: Create and configure the Plotly figure
+        fig = plotly.graph_objects.Figure(
+            data=[plotly.graph_objects.Bar(x=series.index, y=series, marker_color='rgba(66,133,244,0.7)')]
+        )
+        fig.update_layout(
+            yaxis_title=yaxis_title,
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            margin=dict(l=50, r=20, t=20, b=40),
+            height=320
+        )
 
+        # Step 4: Convert to HTML.
+        plot_div = plotly.io.to_html(
+            fig, full_html=False, include_plotlyjs=False, config={'responsive': True},
+        )
+
+        # Append a tiny inline script to update the sidebar metrics
+        # view_type is either 'electricity' (kWh) or 'carbon' (kg CO2e)
+        plot_div += f"""
+        <script>
+        if (window.updateUsageMetrics) {{
+            window.updateUsageMetrics("{view_type}", {total_val:.6f}, {avg_val:.6f}, {bins_len});
+        }}
+        </script>
+        """
     except FileNotFoundError as e:
         plot_div = f"<div class='chart-error'><p>Data file not found: {e.filename}</p></div>"
     except Exception as e:
