@@ -265,10 +265,11 @@ def analysis(request: HttpRequest, source: str) -> HttpResponse:
                 yaxis_title='Energy (kWh)',
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
-                margin=dict(l=50, r=20, t=20, b=40)
+                margin=dict(l=50, r=20, t=20, b=40),
+                height=320
             )
             # `include_plotlyjs='cdn'` is essential for the initial page load to work.
-            plot_div = plotly.io.to_html(fig, full_html=False, include_plotlyjs='cdn')
+            plot_div = plotly.io.to_html(fig, full_html=False, include_plotlyjs='cdn', config={'responsive': True},)
 
     except FileNotFoundError:
         plot_div = "<div class='chart-error'><p>Usage chart data is currently unavailable.</p></div>"
@@ -343,11 +344,12 @@ def get_usage_plot(request: HttpRequest, source: str, range_key: str, view_type:
                 yaxis_title=yaxis_title,
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
-                margin=dict(l=50, r=20, t=20, b=40)
+                margin=dict(l=50, r=20, t=20, b=40),
+                height=320
             )
 
             # Step 4: Convert to HTML. No need to include Plotly.js on these partial updates.
-            plot_div = plotly.io.to_html(fig, full_html=False, include_plotlyjs=False)
+            plot_div = plotly.io.to_html(fig, full_html=False, include_plotlyjs=False, config={'responsive': True},)
 
     except FileNotFoundError as e:
         plot_div = f"<div class='chart-error'><p>Data file not found: {e.filename}</p></div>"

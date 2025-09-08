@@ -652,6 +652,7 @@
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const html = await resp.text();
       plot.innerHTML = html;
+  +   runInlineScripts(plot); // ensure Plotly’s inline script executes
       // Plotly JS is already included in initial div via CDN; the partials do not include it again.
     }catch(e){
       if (errMsg) errMsg.textContent = `Unable to load usage (${e.message}).`;
