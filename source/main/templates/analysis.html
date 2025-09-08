@@ -200,84 +200,84 @@
       </section>
 
       <!-- Workspace list -->
-      {% if workspaces %}
-        <h2 class="workspaces-heading">Your Workspaces</h2>
-        <div class="workspace-list">
-          {% for ws in workspaces %}
-            <div class="workspace-card">
-              <div class="workspace-card-top">
-                <div class="workspace-card-title">
-                  <img src="{% static 'images/icon_new_workspace.png' %}" alt="" class="analysis-card-icon" />
-                  <span>{{ ws.title }}</span>
-                </div>
-                <!-- Gear MUST be inside .workspace-card-top -->
-                <a class="workspace-card-gear" title="Workspace details"
-                   href="{% url 'workspace_detail' source ws.id %}">⚙</a>
-              </div>
-
-              <div class="workspace-owner">Ashraf Hussain</div>
-
-              <div class="workspace-previews">
-                <div class="preview-box">
-                  <div class="preview-label">Desktop</div>
-                </div>
-                <div class="preview-box">
-                  <div class="preview-toolbar">
-                    <select class="kernel-select" disabled>
-                      <option>Jupyter</option>
-                    </select>
+      {% if workspaces_by_project %}
+      {% for pcode, p in workspaces_by_project.items %}
+        <h2 class="workspaces-heading">{{ p.label }} · Active Workspaces</h2>
+        {% if p.items %}
+          <div class="workspace-list">
+            {% for ws in p.items %}
+              <div class="workspace-card">
+                <div class="workspace-card-top">
+                  <div class="workspace-card-title">
+                    <img src="{% static 'images/icon_new_workspace.png' %}" alt="" class="analysis-card-icon" />
+                    <span>{{ ws.title }}</span>
                   </div>
-                  <div class="preview-label">Jupyter</div>
+                  <a class="workspace-card-gear" title="Workspace details"
+                     href="{% url 'workspace_detail' source ws.id %}">⚙</a>
                 </div>
-              </div>
-
-              <!-- Workspace Figures (Electricity & Carbon) -->
-              <div class="ws-figures"
-                   data-total-kwh="{{ ws.total_kwh|default:0 }}"
-                   data-idle-kwh="{{ ws.idle_kwh|default:0 }}"
-                   data-total-kg="{{ ws.total_kg|default:0 }}"
-                   data-idle-kg="{{ ws.idle_kg|default:0 }}"
-                   data-idle-w="{{ ws.idle_w|default:0 }}"
-                   data-ci="{{ ws.ci|default:220 }}">
-                <div class="figure-row">
-                  <div class="figure-label">Electricity (kWh)</div>
-                  <div class="figure-bar" data-kind="kwh" role="img"
-                       aria-label="Idle {{ ws.idle_kwh|default:0 }} of {{ ws.total_kwh|default:0 }} kWh"></div>
-                  <div class="figure-legend">
-                    <span>Total: {{ ws.total_kwh|default:0 }}</span>
-                    <span>Idle: {{ ws.idle_kwh|default:0 }}</span>
+    
+                <div class="workspace-owner">Ashraf Hussain</div>
+    
+                <div class="workspace-previews">
+                  <div class="preview-box">
+                    <div class="preview-label">Desktop</div>
+                  </div>
+                  <div class="preview-box">
+                    <div class="preview-toolbar">
+                      <select class="kernel-select" disabled><option>Jupyter</option></select>
+                    </div>
+                    <div class="preview-label">Jupyter</div>
                   </div>
                 </div>
-
-                <div class="figure-row">
-                  <div class="figure-label">Carbon (kg&nbsp;CO₂e)</div>
-                  <div class="figure-bar" data-kind="kg" role="img"
-                       aria-label="Idle {{ ws.idle_kg|default:0 }} of {{ ws.total_kg|default:0 }} kg CO₂e"></div>
-                  <div class="figure-legend">
-                    <span>Total: {{ ws.total_kg|default:0 }}</span>
-                    <span>Idle: {{ ws.idle_kg|default:0 }}</span>
+    
+                <div class="ws-figures"
+                     data-total-kwh="{{ ws.total_kwh|default:0 }}"
+                     data-idle-kwh="{{ ws.idle_kwh|default:0 }}"
+                     data-total-kg="{{ ws.total_kg|default:0 }}"
+                     data-idle-kg="{{ ws.idle_kg|default:0 }}"
+                     data-idle-w="{{ ws.idle_w|default:0 }}"
+                     data-ci="{{ ws.ci|default:220 }}">
+                  <div class="figure-row">
+                    <div class="figure-label">Electricity (kWh)</div>
+                    <div class="figure-bar" data-kind="kwh" role="img"
+                         aria-label="Idle {{ ws.idle_kwh|default:0 }} of {{ ws.total_kwh|default:0 }} kWh"></div>
+                    <div class="figure-legend">
+                      <span>Total: {{ ws.total_kwh|default:0 }}</span>
+                      <span>Idle: {{ ws.idle_kwh|default:0 }}</span>
+                    </div>
+                  </div>
+    
+                  <div class="figure-row">
+                    <div class="figure-label">Carbon (kg&nbsp;CO₂e)</div>
+                    <div class="figure-bar" data-kind="kg" role="img"
+                         aria-label="Idle {{ ws.idle_kg|default:0 }} of {{ ws.total_kg|default:0 }} kg CO₂e"></div>
+                    <div class="figure-legend">
+                      <span>Total: {{ ws.total_kg|default:0 }}</span>
+                      <span>Idle: {{ ws.idle_kg|default:0 }}</span>
+                    </div>
+                  </div>
+    
+                  <div class="idle-live">
+                    <span class="idle-dot" aria-hidden="true"></span>
+                    <strong>Idle use counter:</strong>
+                    <span class="idle-kwh-counter">0.000</span> kWh ·
+                    <span class="idle-kg-counter">0.0000</span> kg CO₂e
                   </div>
                 </div>
-
-                <div class="idle-live">
-                  <span class="idle-dot" aria-hidden="true"></span>
-                  <strong>Idle use counter:</strong>
-                  <span class="idle-kwh-counter">0.000</span> kWh ·
-                  <span class="idle-kg-counter">0.0000</span> kg CO₂e
+    
+                <div class="workspace-actions">
+                  <button class="start-btn" disabled>START JUPYTER</button>
                 </div>
               </div>
-
-              <div class="workspace-actions">
-                <button class="start-btn" disabled>START JUPYTER</button>
-              </div>
-            </div>
-          {% endfor %}
-        </div>
-      {% else %}
-        <p class="no-workspaces-message">
-          You don't seem to have any workspaces, create a new workspace to get started.
-        </p>
-      {% endif %}
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="no-workspaces-message">No active workspaces in {{ p.label }}.</p>
+        {% endif %}
+      {% endfor %}
+    {% else %}
+      <p class="no-workspaces-message">No active workspaces.</p>
+    {% endif %}
 
     </main>
   </div>

@@ -75,6 +75,9 @@ ISIS_INSTRUMENTS = [
 ]
 CLF_INSTRUMENTS = ['ARTEMIS', 'EPAC', 'GEMINI', 'OCTOPUS', 'ULTRA', 'VULCAN']
 
+ACTIVE_WINDOW_DAYS = 30
+PROJECT_LABELS = {"clf": "CLF", "isis": "ISIS", "diamond": "Diamond"}
+
 # -----------------------------
 # Small helpers
 # -----------------------------
@@ -217,28 +220,42 @@ def analysis(request: HttpRequest, source: str) -> HttpResponse:
     """
     source_key = (source or "").lower()
 
-    # Part 1: Fetch Workspace Data
-    rows = Workspace.objects.filter(source=source_key).order_by("-updated_at")[:50]
-    items = []
+    # Part 1: Fetch active Workspace data for each project (grouped)
     now = dj_tz.now()
-    for w in rows:
-        started = w.started_at or w.created_at
-        elapsed_h = max(1e-6, (now - started).total_seconds() / 3600.0)
-        idle_w = (w.idle_kwh / elapsed_h) * 1000.0 if elapsed_h > 0 else 0
-        ci = int(w.avg_ci_g_per_kwh or 220)
+    active_cutoff = now - timedelta(days=ACTIVE_WINDOW_DAYS)
 
-        items.append({
-            "id": str(w.id),
-            "title": w.title or w.hostname or "Workspace",
-            "instrument": w.instrument,
-            "total_kwh": round(w.total_kwh, 3),
-            "idle_kwh":  round(w.idle_kwh, 3),
-            "total_kg":  round(w.total_kg, 3),
-            "idle_kg":   round(w.idle_kg, 3),
+    def serialize_ws(row):
+        started = row.started_at or row.created_at
+        elapsed_h = max(1e-6, (now - started).total_seconds() / 3600.0)
+        idle_w = (row.idle_kwh / elapsed_h) * 1000.0 if elapsed_h > 0 else 0
+        ci = int(row.avg_ci_g_per_kwh or 220)
+        return {
+            "id": str(row.id),
+            "title": row.title or row.hostname or "Workspace",
+            "instrument": row.instrument,
+            "total_kwh": round(row.total_kwh, 3),
+            "idle_kwh":  round(row.idle_kwh, 3),
+            "total_kg":  round(row.total_kg, 3),
+            "idle_kg":   round(row.idle_kg, 3),
             "idle_w":    round(idle_w, 1),
             "ci":        ci,
-        })
+        }
 
+    grouped = {}
+    for key in ("clf", "isis", "diamond"):
+        rows = (
+            Workspace.objects
+            .filter(source=key, updated_at__gte=active_cutoff)
+            .order_by("-updated_at")[:50]
+        )
+        grouped[key] = {
+            "label": PROJECT_LABELS.get(key, key.upper()),
+            "items": [serialize_ws(w) for w in rows],
+    }
+
+    # Keep the original list for the *current* source so the rest of the view/template keeps working
+    source_key = (source or "").lower()
+    items = grouped.get(source_key, {"items": []})["items"]
     # Part 2: Generate the Initial Plotly Chart
     plot_div = None
     try:
@@ -335,6 +352,7 @@ def analysis(request: HttpRequest, source: str) -> HttpResponse:
         }.get(source_key, f"{source.title()} Data Analysis"),
         "source": source_key,
         "workspaces": items,
+        "workspaces_by_project": grouped,
         "usage_plot_div": plot_div,
     }
     return render(request, "analysis.html", context)
