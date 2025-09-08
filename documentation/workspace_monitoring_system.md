@@ -6,60 +6,22 @@ This note explains how the **workspace** metrics are collected, stored, and disp
 
 ## What it does
 
-* Every minute, a poller (`sync_workspaces` management command) queries **Prometheus** to:
+* A management command ('get_active_workspaces') queries the existing node_cpu_seconds_total parquet to find hosts that were active in the last hour that exists in that parquet:
 
   * Find **active hosts** (`up == 1`) for the site.
-  * Get **start time** from `node_boot_time_seconds` (used as the workspace’s `started_at`).
-  * Compute **idle fraction** from CPU: `rate(node_cpu_seconds_total{mode="idle"}[1m]) / rate(node_cpu_seconds_total[1m])`.
-  * Estimate **cores** and **memory activity** (Active / MemTotal).
-* At the same time, it fetches current **carbon intensity** (gCO₂/kWh) from the **GB Carbon Intensity API**.
-* It estimates per‑minute **energy** for each host, splits it into **busy vs idle**, converts to **kgCO₂e**, and stores everything in the `Workspace` row.
+  * Get **start time** from `node_boot_time_seconds` (used as the workspace’s `started_at`). This data is gained by querying the prometheus database
+  * Use the existing node_cpu_seconds_total parquet to find the idle and busy total for each host.
+ 
+  * At the same time, it fetches current **carbon intensity** (gCO₂/kWh) from the **GB Carbon Intensity API**.
+  * It estimates kilowatt-hours and carbon foorprint of both idle and busy usage. It saves these in a sqllite db, to be queried later in a django view in order to populate Workspace models. It estimates in the same manner used in the calculate_project_usage and calculate_project_footprint commands.
 
 ## Where the data shows up
 
 * The **Analysis** page (`/analysis/<site>/`) reads from the `Workspace` table and renders the existing cards.
-* Each card shows totals (kWh, kgCO₂e) and a live **Idle Use** ticker based on stored idle energy.
+* Each card shows totals (kWh, kgCO₂e). There will be a circle that flashes next to these totals to indicate that they are live values but they won't actually be live as this is a mockup.
+* Each card displays a doughnut graph comparing idle and busy usage.
 
-## How the numbers are calculated (per host)
 
-* **Idle fraction** = idle CPU time ÷ total CPU time over the last minute.
-* **Power model (W)** per minute:
-
-  * `CPU = cores × cpu_tdp_w × (1 − idle_fraction)`
-  * `RAM = ram_w × mem_active_ratio`
-  * `Other = other_w`
-  * `Watts = CPU + RAM + Other`
-* **Energy (kWh)** per minute: `Watts / 1000 × (60 / 3600)`
-* **Split**: `busy_kWh = kWh × (1 − idle_fraction)`; `idle_kWh = kWh × idle_fraction`
-* **Emissions (kgCO₂e)**: `kWh × (CI_g_per_kWh / 1000)`
-* **Runtime seconds** only increases with the **busy** portion.
-
-## How to run
-
-1. Ensure `PROMETHEUS_URL` is set in Django settings.
-2. Start the poller (looping):
-
-   ```bash
-   python manage.py sync_workspaces --sleep 60
-   ```
-
-   Or run one cycle:
-
-   ```bash
-   python manage.py sync_workspaces --once
-   ```
-3. Start the web app:
-
-   ```bash
-   python manage.py runserver
-   ```
-4. Open: `/analysis/clf/`, `/analysis/isis/`, `/analysis/diamond/`.
-
-## Configuration knobs (in the command)
-
-* **Site mapping** → Prom label: `clf/isis/diamond → cloud_project_name` values.
-* **Power model**: `cpu_tdp_w`, `ram_w`, `other_w` 
-* **Carbon intensity**: fetched live (cached \~5 minutes); fallback used if API is down.
 
 
 
