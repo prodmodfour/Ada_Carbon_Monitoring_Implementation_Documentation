@@ -152,7 +152,7 @@
         </div>
 
         <div class="usage-body">
-          <div id="usagePlot" class="usage-chart">
+          <div id="usagePlot" class="usage-chart" style="position:relative; height: 320px; max-width: 100%; overflow: hidden;">
             {{ usage_plot_div|safe }}
           </div>
           <aside class="usage-metrics">
@@ -627,6 +627,21 @@
     const tpl = controls.getAttribute('data-url-template') || '';
     // Replace only the placeholders we inserted in the Django URL helper
     return tpl.replace('/RANGE/', `/${currentRange}/`).replace('/VIEW/', `/${currentView}/`);
+  }
+
+  function runInlineScripts(container){
+    const scripts = Array.from(container.querySelectorAll('script'));
+    for (const old of scripts) {
+      const s = document.createElement('script');
+      if (old.src) {
+        s.src = old.src;
+      } else {
+        s.textContent = old.textContent;
+      }
+      // Carry over attributes Plotly uses (type, etc.)
+      Array.from(old.attributes).forEach(a => s.setAttribute(a.name, a.value));
+      old.replaceWith(s);
+    }
   }
 
   async function refresh(){
