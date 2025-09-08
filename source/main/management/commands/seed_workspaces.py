@@ -1,75 +1,87 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from main.models import Workspace
-import random
-import uuid
+import random, uuid
 from datetime import timedelta
 
 class Command(BaseCommand):
-    help = "Seeds the database with fake Workspace rows (no arguments)."
+    help = "Seed workspaces with busy + idle usage and non-zero idle counters."
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **opts):
         rng = random.Random(42)
         now = timezone.now()
 
         sources = ["clf", "isis", "diamond"]
         instruments = {
-            "clf": ["ARTEMIS", "EPAC", "GEMINI", "OCTOPUS", "ULTRA", "VULCAN"],
+            "clf": ["ARTEMIS","EPAC","GEMINI","OCTOPUS","ULTRA","VULCAN"],
             "isis": ['ALF','ARGUS','CRISP','EMU','ENGINX','GEM','HIFI','HRPD','IMAT','INTER','IRIS','LARMOR','LET','LOQ','MAPS','MARI','MERLIN','MUSR','NIMROD','OFFSPEC','OSIRIS','PEARL','POLARIS','POLREF','SANDALS','SANS2D','SURF','SXD','TOSCA','WISH','ZOOM'],
             "diamond": ["I03","I04","I11","I12","I13","I19","B24","B21.1","I23","I22"]
         }
 
-        total_created = 0
-
+        total = 0
         for src in sources:
-            for i in range(rng.randint(6, 12)):  # 6–12 workspaces per project
-                inst = rng.choice(instruments[src])
-                title = f"{src.upper()} Workspace {i+1}"
-                host = f"host-{rng.randint(10,99)}-{rng.randint(0,255)}-{rng.randint(0,255)}.local"
-                started_delta_days = rng.randint(1, 45)
-                started_at = now - timedelta(days=started_delta_days, hours=rng.randint(0, 23))
-
+            for i in range(rng.randint(6, 10)):
                 ws = Workspace.objects.create(
                     id=uuid.uuid4(),
                     source=src,
-                    instrument=inst,
-                    title=title,
+                    instrument=rng.choice(instruments[src]),
+                    title=f"{src.upper()} Workspace {i+1}",
                     owner="Demo User",
-                    hostname=host,
-                    started_at=started_at if rng.random() < 0.9 else None,  # a few never started
-                    runtime_seconds=0,
-                    total_kwh=0.0,
-                    total_kg=0.0,
-                    idle_kwh=0.0,
-                    idle_kg=0.0,
-                    avg_ci_g_per_kwh=None,
-                    last_ci_g_per_kwh=None,
-                    last_sampled_at=None,
+                    hostname=f"host-{rng.randint(10,99)}-{rng.randint(0,255)}-{rng.randint(0,255)}.local",
                 )
 
-                # Build up some usage samples to land “recently updated” rows.
-                # Keep it simple: 8–40 samples, 30–90 minutes between, variable energy.
-                ci_g_per_kwh = rng.choice([180, 200, 220, 240, 260])
-                t = started_at
-                for _ in range(rng.randint(8, 40)):
-                    dt_minutes = rng.randint(30, 90)
-                    duration_s = dt_minutes * 60
-                    # 0.05–0.50 kWh per sample; some marked idle
-                    energy_kwh = round(rng.uniform(0.05, 0.50), 3)
-                    idle = rng.random() < 0.35
-                    ws.record_usage(
-                        duration_s=duration_s,
-                        energy_kwh=energy_kwh,
-                        ci_g_per_kwh=ci_g_per_kwh,
-                        idle=idle,
-                    )
-                    t += timedelta(minutes=dt_minutes)
+                ci_gpkwh = rng.choice([180, 200, 220, 240, 260])
 
-                # Nudge updated_at within last ~60 days (so some are "inactive")
-                recent_nudge_days = rng.randint(0, 60)
-                ws.updated_at = now - timedelta(days=recent_nudge_days)
+                # Choose realistic idle wattage per project
+                base_idle_w = {
+                    "clf": rng.randint(70, 140),
+                    "isis": rng.randint(40, 110),
+                    "diamond": rng.randint(50, 120),
+                }[src]
+
+                # Make a recent idle window (60–120 min) that will continue ticking
+                recent_idle_minutes = rng.randint(60, 120)
+                recent_start = now - timedelta(minutes=recent_idle_minutes)
+
+                # Start the workspace a few hours before the recent window so averages make sense
+                ws.started_at = recent_start - timedelta(hours=rng.randint(2, 6))
+                ws.save(update_fields=["started_at"])
+
+                # ---- (A) Busy + idle history BEFORE the recent window ----
+                t = ws.started_at
+                while t < recent_start:
+                    step_min = rng.randint(20, 60)
+                    duration_s = step_min * 60
+                    is_idle = rng.random() < 0.35  # ~35% idle in history
+
+                    if is_idle:
+                        w = base_idle_w * rng.uniform(0.9, 1.15)
+                    else:
+                        w = base_idle_w * rng.uniform(2.0, 6.0)  # active draw higher
+
+                    kwh = round((w / 1000.0) * (step_min / 60.0), 4)
+                    ws.record_usage(duration_s=duration_s, energy_kwh=kwh, ci_g_per_kwh=ci_gpkwh, idle=is_idle)
+                    t += timedelta(minutes=step_min)
+
+                # Ensure a non-zero idle baseline even if random history had few idle samples
+                if ws.idle_kwh == 0:
+                    # Add one small idle block (15 min)
+                    kwh = round((base_idle_w / 1000.0) * (15 / 60.0), 4)
+                    ws.record_usage(duration_s=15*60, energy_kwh=kwh, ci_g_per_kwh=ci_gpkwh, idle=True)
+
+                # ---- (B) Recent idle streak (5–15 min cadence) so ticker starts > 0 and keeps moving ----
+                t = recent_start
+                while t < now:
+                    step_min = rng.choice([5, 10, 15])
+                    duration_s = step_min * 60
+                    kwh = round((base_idle_w / 1000.0) * (step_min / 60.0), 4)
+                    ws.record_usage(duration_s=duration_s, energy_kwh=kwh, ci_g_per_kwh=ci_gpkwh, idle=True)
+                    t += timedelta(minutes=step_min)
+
+                # Fresh vs stale updated_at so your "active" filter still has variety
+                ws.updated_at = now - (timedelta(minutes=rng.randint(0, 45)) if rng.random() < 0.8
+                                       else timedelta(days=rng.randint(31, 60)))
                 ws.save(update_fields=["updated_at"])
+                total += 1
 
-                total_created += 1
-
-        self.stdout.write(self.style.SUCCESS(f"Seeded {total_created} workspaces."))
+        self.stdout.write(self.style.SUCCESS(f"Seeded {total} workspaces with busy+idle usage and non-zero idle counters."))

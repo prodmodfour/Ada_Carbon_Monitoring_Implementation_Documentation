@@ -879,15 +879,21 @@
       const incrKwh = (idleW / 1000) / 3600;   // kWh per second
       const incrKg  = incrKwh * (ci / 1000);   // kg CO2e per second
   
-      let kwh = 0, kg = 0;
-      function tick() {
-        kwh += incrKwh;
-        kg  += incrKg;
-        if (elK) elK.textContent = fmt(kwh, 3);
-        if (elG) elG.textContent = fmt(kg, 4);
-      }
-      tick();
-      setInterval(tick, 1000);
+      let kwh = idleK;
+    let kg  = idleG;
+
+    function render(){
+      if (elK) elK.textContent = fmt(kwh, 3);
+      if (elG) elG.textContent = fmt(kg, 4);
+    }
+    function tick(){
+      kwh += incrKwh;
+      kg  += incrKg;
+      render();
+    }
+
+    render();                 // show seeded values immediately
+    if (idleW > 0) setInterval(tick, 1000); // keep ticking if there’s live idle power
     });
   })();
   </script>
