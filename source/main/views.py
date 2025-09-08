@@ -246,12 +246,19 @@ def analysis(request: HttpRequest, source: str) -> HttpResponse:
         if project_name:
             df_elec = pd.read_parquet("project_estimated_electricity_usage.parquet")
             df_project = df_elec[df_elec['project_name'] == project_name].copy()
-            df_project['timestamp'] = pd.to_datetime(df_project['timestamp'])
+            df_project['timestamp'] = pd.to_datetime(df_project['timestamp'], utc=True)  # tz-aware
             df_project.set_index('timestamp', inplace=True)
 
-            # Default to an hourly view for the last 24 hours
-            df_resampled = df_project.resample('H').sum()
-            kwh_series = (df_resampled['estimated_watt_hours'] / 1000)
+            # last 24 hours only (tz-aware to match index)
+            end = pd.Timestamp.now(tz='UTC')
+            start = end - pd.Timedelta(hours=24)
+
+            mask = (df_project.index >= start) & (df_project.index <= end)
+            kwh_series = (
+                pd.to_numeric(df_project.loc[mask, 'estimated_watt_hours'], errors='coerce')
+                .resample('H').sum() / 1000.0
+            )
+
 
             fig = plotly.graph_objects.Figure(data=[plotly.graph_objects.Bar(x=kwh_series.index, y=kwh_series, marker_color='rgba(66,133,244,0.7)')])
             fig.update_layout(
@@ -289,7 +296,7 @@ def get_usage_plot(request: HttpRequest, source: str, range_key: str, view_type:
     """
     plot_div = "<div class='chart-error'><p>Chart data not found.</p></div>"
     source_key = source.lower()
-    
+
     try:
         project_name = PROJECT_TO_LABELVAL.get(source_key)
         if project_name:
@@ -297,30 +304,48 @@ def get_usage_plot(request: HttpRequest, source: str, range_key: str, view_type:
             if view_type == 'electricity':
                 df = pd.read_parquet("project_estimated_electricity_usage.parquet")
                 value_col, yaxis_title = 'estimated_watt_hours', 'Energy (kWh)'
-            else: # 'carbon'
+            else:  # 'carbon'
                 df = pd.read_parquet("project_carbon_footprint.parquet")
                 value_col, yaxis_title = 'carbon_footprint_gCO2e', 'Emissions (kg CO₂e)'
 
-            # Step 2: Filter and resample data based on the selected range_key
+            # Step 2: Filter to the project and index by timestamp (UTC-aware)
             df_project = df[df['project_name'] == project_name].copy()
-            df_project['timestamp'] = pd.to_datetime(df_project['timestamp'])
+            df_project['timestamp'] = pd.to_datetime(df_project['timestamp'], utc=True)  # <-- make tz-aware
             df_project.set_index('timestamp', inplace=True)
 
-            resample_rule = {'day': 'H', 'month': 'D', 'year': 'M'}.get(range_key, 'H')
-            df_resampled = df_project.resample(resample_rule).sum()
-            
-            # Convert units (W-h to kW-h, or gCO2e to kgCO2e)
-            series = df_resampled[value_col] / 1000
+  
+            now = pd.Timestamp.now(tz='UTC')  # <-- tz-aware to match index
+            if   range_key == 'day':
+                start, rule = now - pd.Timedelta(days=1), 'H'
+            elif range_key == 'month':
+                start, rule = now - pd.Timedelta(days=30), 'D'
+            elif range_key == 'year':
+                start, rule = now - pd.Timedelta(days=365), 'M'
+            else:
+                start, rule = now - pd.Timedelta(days=1), 'H'
+
+            mask = (df_project.index >= start) & (df_project.index <= now)
+
+            series = (
+                pd.to_numeric(df_project.loc[mask, value_col], errors='coerce')
+                .resample(rule).sum() / 1000.0
+)
+            # -----------------------------------------------------------------
+
+            if series.empty:
+                return HttpResponse("<div class='chart-error'><p>No data in selected range.</p></div>")
 
             # Step 3: Create and configure the Plotly figure
-            fig = plotly.graph_objects.Figure(data=[plotly.graph_objects.Bar(x=series.index, y=series, marker_color='rgba(66,133,244,0.7)')])
+            fig = plotly.graph_objects.Figure(
+                data=[plotly.graph_objects.Bar(x=series.index, y=series, marker_color='rgba(66,133,244,0.7)')]
+            )
             fig.update_layout(
                 yaxis_title=yaxis_title,
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
                 margin=dict(l=50, r=20, t=20, b=40)
             )
-            
+
             # Step 4: Convert to HTML. No need to include Plotly.js on these partial updates.
             plot_div = plotly.io.to_html(fig, full_html=False, include_plotlyjs=False)
 
@@ -328,7 +353,7 @@ def get_usage_plot(request: HttpRequest, source: str, range_key: str, view_type:
         plot_div = f"<div class='chart-error'><p>Data file not found: {e.filename}</p></div>"
     except Exception as e:
         plot_div = f"<div class='chart-error'><p>Error rendering chart: {e}</p></div>"
-        
+
     return HttpResponse(plot_div)
 
 def instruments(request: HttpRequest, source: str) -> HttpResponse:
