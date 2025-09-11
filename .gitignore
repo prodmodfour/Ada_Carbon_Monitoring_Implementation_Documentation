@@ -89,3 +89,7 @@ htmlcov/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# Data storage files
+*.parquet
+*.json
