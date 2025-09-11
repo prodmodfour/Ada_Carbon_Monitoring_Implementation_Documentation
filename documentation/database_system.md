@@ -35,7 +35,7 @@ The UK's Carbon Intensity API requires the ISO 8601 format (e.g., 2025-09-11T10:
 
 ### Status
 * not downloaded
-* download failed
+* download incomplete
 * unprocessed
 * processed
 * fake
@@ -47,14 +47,28 @@ The UK's Carbon Intensity API requires the ISO 8601 format (e.g., 2025-09-11T10:
 
 ```json
 {
-    "machine_name": "Artemis Matlab",
-    "number_data_points_busy_kwh": 0,
-    "running_average_busy_kwh": 0,
-    "number_data_points_idle_kwh": 0,
-    "running_average_idle_kwh": 0,
-    "number_data_points_gCo2eq": 0,
-    "running_average_busy_gCo2eq": 0,
-    "running_average_idle_gCo2eq": 0
+  "machine_name": "Artemis Matlab",
+  "metrics": {
+    "energy_kwh": {
+      "busy": {
+        "number_data_points": 0,
+        "running_average": 0
+      },
+      "idle": {
+        "number_data_points": 0,
+        "running_average": 0
+      }
+    },
+    "carbon_gCo2eq": {
+        "number_data_points": 0,
+        "busy": {
+            "running_average": 0
+        },
+        "idle": {
+            "running_average": 0
+      }
+    }
+  }
 }
 ```
 
@@ -69,5 +83,6 @@ The UK's Carbon Intensity API requires the ISO 8601 format (e.g., 2025-09-11T10:
     "idle_kwh": 0,
     "busy_gCo2eq": 0,
     "idle_gCo2eq": 0
+    "started_at": "2025-09-11T10:30:00Z"
 }
 ```
