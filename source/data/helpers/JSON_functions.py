@@ -1,8 +1,14 @@
 import json
 from datetime import datetime
 import os
+from data.helpers.EstimatedUsageEntry import EstimatedUsageEntry
 
-
+def construct_estimated_project_usage_file_path(cloud_project_name, timestamp):
+    year = timestamp.year
+    month = timestamp.month
+    day = timestamp.day
+    hour = timestamp.hour
+    return "data/estimated_project_usage/" + cloud_project_name + "/" + str(year) + "/" + str(month) + "/" + str(day) + "/" + str(hour) + ".json"
 
 def save_estimated_project_usage_entry(cloud_project_name, entry):
     # Get Year, Month, Day, hour from datetime object
@@ -11,11 +17,11 @@ def save_estimated_project_usage_entry(cloud_project_name, entry):
     day = entry.timestamp.day
     hour = entry.timestamp.hour
     # Construct filepath
-    subfolder = "data/estimated_project_usage/" + cloud_project_name + "/" + str(year) + "/" + str(month) + "/" + str(day) + "/"
-    file = subfolder + str(hour) + ".json"
+    file_path = construct_estimated_project_usage_file_path(cloud_project_name, timestamp)
+
 
     # Create the file if it doesn't exist
-    if not os.path.exists(subfolder):
+    if not os.path.exists(file_path):
         os.makedirs(subfolder)
 
     # Save the entry to the file
@@ -29,10 +35,13 @@ def load_estimated_project_usage_entry(cloud_project_name, timestamp):
     day = timestamp.day
     hour = timestamp.hour
     # Construct filepath
-    subfolder = "data/estimated_project_usage/" + cloud_project_name + "/" + str(year) + "/" + str(month) + "/" + str(day) + "/"
-    file = subfolder + str(hour) + ".json"
+    file_path = construct_estimated_project_usage_file_path(cloud_project_name, timestamp)
+
     # Load the entry from the file
-    with open(file, "r") as f:
+    if not os.path.exists(file_path):
+        return EstimatedUsageEntry()
+
+    with open(file_path, "r") as f:
         json = json.load(f)
 
     # Construct an EstimatedUsageEntry from the json
