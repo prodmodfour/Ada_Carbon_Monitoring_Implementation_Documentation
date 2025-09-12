@@ -31,7 +31,6 @@ class EstimatedUsageEntry:
         else:
             self.status = "processed"
 
-
     def set_cpu_seconds_total(self, busy_cpu_seconds_total, idle_cpu_seconds_total):
         self.busy_cpu_seconds_total = busy_cpu_seconds_total
         self.idle_cpu_seconds_total = idle_cpu_seconds_total
@@ -53,7 +52,7 @@ class EstimatedUsageEntry:
 
     def construct_json(self):
         return json.dumps({
-            "timestamp": self.timestamp,
+            "timestamp": self.timestamp.isoformat(),
             "busy_cpu_seconds_total": self.busy_cpu_seconds_total,
             "idle_cpu_seconds_total": self.idle_cpu_seconds_total,
             "busy_usage_kwh": self.busy_usage_kwh,
