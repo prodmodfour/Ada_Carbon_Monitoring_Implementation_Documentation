@@ -27,14 +27,20 @@ class PrometheusAPIClient:
             return data
 
         except requests.exceptions.ReadTimeout:
-            print(f"Request timed out for entry at {current_datetime}. Skipping.")
+            print(f"Request timed out for entry at {parameters.get("start")}. Skipping.")
 
             return None
         except requests.HTTPError as e:
-            print(f"HTTPError for entry at {current_datetime}. Skipping.")
+            try:
+                print("Error body:", response.text)
+            except Exception:
+                pass
+        except Exception:
+            pass
+            print(f"HTTPError for entry at {parameters.get("start")}. Skipping.")
             return None
         except requests.exceptions.RequestException as e:
-            print(f"RequestException for entry at {current_datetime}. Skipping.")
+            print(f"RequestException for entry at {parameters.get("start")}. Skipping.")
             return None
         return None
 
