@@ -33,8 +33,8 @@ def load_estimated_project_usage_entry(cloud_project_name, timestamp):
 
     # Construct an EstimatedUsageEntry from the json
     entry = EstimatedUsageEntry()
-    entry.set_timestamp(json["timestamp"])
-    entry.set_cpu_seconds_total(json["busy_cpu_seconds_total"], json["idle_cpu_seconds_total"])
-    entry.set_usage_kwh(json["busy_usage_kwh"], json["idle_usage_kwh"])
-    entry.set_usage_gCO2eq(json["busy_usage_gCO2eq"], json["idle_usage_gCO2eq"])
+    entry.set_timestamp(data["timestamp"])
+    entry.set_cpu_seconds_total(data["busy_cpu_seconds_total"], data["idle_cpu_seconds_total"])
+    entry.set_usage_kwh(data["busy_usage_kwh"], data["idle_usage_kwh"])
+    entry.set_usage_gCO2eq(data["busy_usage_gCO2eq"], data["idle_usage_gCO2eq"])
     return entry
