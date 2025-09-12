@@ -56,6 +56,7 @@ def refresh_project_data(cloud_project_name, start_timestamp, end_timestamp):
     while current_timestamp < end_timestamp:
         # Load the entry from the JSON file
         entry = load_estimated_project_usage_entry(cloud_project_name, current_timestamp)
+        entry.set_timestamp(current_timestamp)
 
         print(f"Current timestamp: {current_timestamp}")
 
@@ -102,9 +103,7 @@ def refresh_project_data(cloud_project_name, start_timestamp, end_timestamp):
         print(f"Busy CPU seconds total: {busy_cpu_seconds_total}")
         print(f"Idle CPU seconds total: {idle_cpu_seconds_total}")
 
-        # Create an EstimatedUsageEntry
-        entry = EstimatedUsageEntry()
-        entry.set_timestamp(current_timestamp)
+        
         entry.set_cpu_seconds_total(busy_cpu_seconds_total, idle_cpu_seconds_total)
 
         # Save the entry
