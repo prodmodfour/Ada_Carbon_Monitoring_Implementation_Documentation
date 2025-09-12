@@ -13,8 +13,6 @@ def construct_estimated_project_usage_file_path(cloud_project_name, timestamp):
 def save_estimated_project_usage_entry(cloud_project_name, entry):
     file_path = construct_estimated_project_usage_file_path(cloud_project_name, entry.timestamp)
 
-
-    # Create the file if it doesn't exist
     if not os.path.exists(file_path):
         os.makedirs(os.path.dirname(file_path))
 
@@ -31,7 +29,7 @@ def load_estimated_project_usage_entry(cloud_project_name, timestamp):
         return EstimatedUsageEntry()
 
     with open(file_path, "r") as f:
-        json = json.load(f)
+        data = json.load(f)
 
     # Construct an EstimatedUsageEntry from the json
     entry = EstimatedUsageEntry()
