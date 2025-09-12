@@ -1,3 +1,6 @@
+import json
+
+
 class EstimatedUsageEntry:
     def __init__(self):
         self.timestamp = None
@@ -47,3 +50,15 @@ class EstimatedUsageEntry:
         def set_timestamp(self, timestamp):
             self.timestamp = timestamp
             self.determine_status()
+
+        def construct_json(self):
+            return json.dumps({
+                "timestamp": self.timestamp,
+                "busy_cpu_seconds_total": self.busy_cpu_seconds_total,
+                "idle_cpu_seconds_total": self.idle_cpu_seconds_total,
+                "busy_usage_kwh": self.busy_usage_kwh,
+                "idle_usage_kwh": self.idle_usage_kwh,
+                "busy_usage_gCO2eq": self.busy_usage_gCO2eq,
+                "idle_usage_gCO2eq": self.idle_usage_gCO2eq,
+                "status": self.status
+            }
