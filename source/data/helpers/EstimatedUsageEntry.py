@@ -1,5 +1,5 @@
 import json
-
+from datetime import datetime
 
 class EstimatedUsageEntry:
     def __init__(self):
@@ -61,3 +61,13 @@ class EstimatedUsageEntry:
             "idle_usage_gCO2eq": self.idle_usage_gCO2eq,
             "status": self.status
         })
+
+
+if __name__ == "__main__":
+    print("Testing Estimated Entry Usage")
+    entry = EstimatedUsageEntry()
+    entry.set_timestamp(datetime.now())
+    entry.set_cpu_seconds_total(100, 100)
+    entry.set_usage_kwh(100, 100)
+    entry.set_usage_gCO2eq(100, 100)
+    print(entry.construct_json())
