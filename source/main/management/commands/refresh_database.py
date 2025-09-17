@@ -9,8 +9,9 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         print("Refreshing the database with the latest data.")
 
-    cloud_project_name_labels = [ "IDAaaS"]
-    # Start 1 year ago
+    cloud_project_name_labels = ["IDAaaS"]
+
+
     start_timestamp = (datetime.now() - timedelta(hours=1))
     end_timestamp = datetime.now()
     print(f"Start timestamp: {start_timestamp}")
