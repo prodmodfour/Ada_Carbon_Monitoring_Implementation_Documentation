@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 import os
-from data.helpers.EstimatedUsageEntry import EstimatedUsageEntry
+from EstimatedUsageEntry import EstimatedUsageEntry
 
 def construct_estimated_project_usage_file_path(cloud_project_name, timestamp):
     year = timestamp.year
@@ -38,3 +38,15 @@ def load_estimated_project_usage_entry(cloud_project_name, timestamp):
     entry.set_usage_kwh(data["busy_usage_kwh"], data["idle_usage_kwh"])
     entry.set_usage_gCO2eq(data["busy_usage_gCO2eq"], data["idle_usage_gCO2eq"])
     return entry
+
+if __name__ == "__main__":
+    print("Testing JSON Functions")
+    entry = EstimatedUsageEntry()
+    entry.set_timestamp(datetime.now())
+    entry.set_cpu_seconds_total(100, 100)
+    entry.set_usage_kwh(100, 100)
+    entry.set_usage_gCO2eq(100, 100)
+    print(entry.construct_json())
+    save_estimated_project_usage_entry("test", entry)
+    entry = load_estimated_project_usage_entry("test", datetime.now())
+    print(entry.construct_json())
