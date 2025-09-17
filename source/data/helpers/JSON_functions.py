@@ -33,7 +33,7 @@ def load_estimated_project_usage_entry(cloud_project_name, timestamp):
 
     # Construct an EstimatedUsageEntry from the json
     entry = EstimatedUsageEntry()
-    entry.set_timestamp(data["timestamp"])
+    entry.set_timestamp(datetime.fromisoformat(data["timestamp"]))
     entry.set_cpu_seconds_total(data["busy_cpu_seconds_total"], data["idle_cpu_seconds_total"])
     entry.set_usage_kwh(data["busy_usage_kwh"], data["idle_usage_kwh"])
     entry.set_usage_gCO2eq(data["busy_usage_gCO2eq"], data["idle_usage_gCO2eq"])
@@ -46,7 +46,11 @@ if __name__ == "__main__":
     entry.set_cpu_seconds_total(100, 100)
     entry.set_usage_kwh(100, 100)
     entry.set_usage_gCO2eq(100, 100)
+
+    print("Json to save:")
     print(entry.construct_json())
     save_estimated_project_usage_entry("test", entry)
+    
     entry = load_estimated_project_usage_entry("test", datetime.now())
+    print("Json loaded:")
     print(entry.construct_json())
