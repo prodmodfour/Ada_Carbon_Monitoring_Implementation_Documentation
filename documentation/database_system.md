@@ -8,7 +8,7 @@
     "00:00": {
       "all": {
         "busy_cpu_seconds_total": 0.0,
-        "idle_cpu_second_total": 0.0,
+        "idle_cpu_seconds_total": 0.0,
         "busy_kwh": 0.0,
         "idle_kwh": 0.0,
         "busy_gCo2eq": 0.0,
