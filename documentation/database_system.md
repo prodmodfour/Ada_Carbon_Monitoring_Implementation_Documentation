@@ -45,12 +45,6 @@
 }
 ```
 
-### Status
-* fake: has usage data, but no cpu data
-* not downloaded: no data in any field
-* unprocessed: has cpu data, but no usage data  
-* processed: All fields populated
-
 ## Machine Metrics
 ```json
 {
