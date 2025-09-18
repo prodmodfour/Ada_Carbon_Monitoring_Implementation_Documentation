@@ -2,7 +2,6 @@
 ```json
 {
   "cloud_project_name": "project",
-  "status": "processed",
   "date": "DD_MM_YYYY",
   "timeseries": {
     "totals": {
