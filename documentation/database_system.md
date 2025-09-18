@@ -1,4 +1,4 @@
-# Estimated Electricity Usage and Carbon Footprint
+# EstimatedUsageDayEntry
 ```json
 {
   "cloud_project_name": "project",
@@ -22,7 +22,7 @@
         "busy_gCo2eq": 0.0,
         "idle_gCo2eq": 0.0
       }
-  },
+    },
     "00:00": {
       "all": {
         "busy_cpu_seconds_total": 0.0,
