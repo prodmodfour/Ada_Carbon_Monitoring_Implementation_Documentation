@@ -33,7 +33,7 @@
 * unprocessed: has cpu data, but no usage data  
 * processed: All fields populated
 
-## Average Electricity Usage and Carbon Footprint
+## Machine Metrics
 ### By Machine name
 * Running average
 * Stored in JSON
@@ -44,21 +44,18 @@
   "metrics": {
     "energy_kwh": {
       "busy": {
-        "number_data_points": 0,
-        "running_average": 0
+        "average": 0.0
       },
       "idle": {
-        "number_data_points": 0,
-        "running_average": 0
+        "average": 0.0
       }
     },
     "carbon_gCo2eq": {
-        "number_data_points": 0,
         "busy": {
-            "running_average": 0
+            "average": 0.0
         },
         "idle": {
-            "running_average": 0
+            "average": 0.0
       }
     }
   }
