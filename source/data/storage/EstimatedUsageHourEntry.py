@@ -44,5 +44,6 @@ class EstimatedUsageHourEntry:
             "busy_gCo2eq": busy_gCo2eq,
             "idle_gCo2eq": idle_gCo2eq
         }
+        self.compute_all_entry()
 
 
