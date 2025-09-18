@@ -34,10 +34,6 @@
 * processed: All fields populated
 
 ## Machine Metrics
-### By Machine name
-* Running average
-* Stored in JSON
-
 ```json
 {
   "machine_name": "Artemis Matlab",
