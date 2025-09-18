@@ -5,7 +5,7 @@
   "status": "processed",
   "date": "DD_MM_YYYY",
   "timeseries": {
-    "00:00": {
+    "totals": {
       "all": {
         "busy_cpu_seconds_total": 0.0,
         "idle_cpu_seconds_total": 0.0,
@@ -15,6 +15,24 @@
         "idle_gCo2eq": 0.0
       },
       "ARTEMIS_MATLAB": {
+        "busy_cpu_seconds_total": 0.0,
+        "idle_cpu_second_total": 0.0,
+        "busy_kwh": 0.0,
+        "idle_kwh": 0.0,
+        "busy_gCo2eq": 0.0,
+        "idle_gCo2eq": 0.0
+      }
+  },
+    "00:00": {
+      "all": {
+        "busy_cpu_seconds_total": 0.0,
+        "idle_cpu_seconds_total": 0.0,
+        "busy_kwh": 0.0,
+        "idle_kwh": 0.0,
+        "busy_gCo2eq": 0.0,
+        "idle_gCo2eq": 0.0
+      },
+        "ARTEMIS_MATLAB": {
         "busy_cpu_seconds_total": 0.0,
         "idle_cpu_second_total": 0.0,
         "busy_kwh": 0.0,
