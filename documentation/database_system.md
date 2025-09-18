@@ -45,7 +45,7 @@
 }
 ```
 
-## Machine Metrics
+## MachineMetrics
 ```json
 {
   "machine_name": "Artemis Matlab",
@@ -70,7 +70,7 @@
 }
 ```
 
-# Active Workspace Tracking
+# ActiveWorkspace
 
 * Stored in JSON
 ```json
