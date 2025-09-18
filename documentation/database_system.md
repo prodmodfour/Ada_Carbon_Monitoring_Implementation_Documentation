@@ -1,18 +1,31 @@
 # Estimated Electricity Usage and Carbon Footprint
-## By project (IDAaaS, CDAaaS, DDAaaS)
-* Binned by hour
-* Stored as a time series in parquet
-* Each hour is stored as a json file
-* Each json file contains the following fields:
-  * timestamp
-  * busy_cpu_seconds_total
-  * idle_cpu_seconds_total
-  * busy_usage_kwh
-  * idle_usage_kwh
-  * busy_usage_gCO2eq
-  * idle_usage_gCO2eq
-  * status
-
+```json
+{
+  "cloud_project_name": "project",
+  "status": "processed",
+  "date": "DD_MM_YYYY",
+  "timeseries": {
+    "00:00": {
+      "all": {
+        "busy_cpu_seconds_total": 0.0,
+        "idle_cpu_second_total": 0.0,
+        "busy_kwh": 0.0,
+        "idle_kwh": 0.0,
+        "busy_gCo2eq": 0.0,
+        "idle_gCo2eq": 0.0
+      }
+      "ARTEMIS_MATLAB": {
+        "busy_cpu_seconds_total": 0.0,
+        "idle_cpu_second_total": 0.0,
+        "busy_kwh": 0.0,
+        "idle_kwh": 0.0,
+        "busy_gCo2eq": 0.0,
+        "idle_gCo2eq": 0.0
+      }
+    }
+  }
+}
+```
 
 ### Status
 * fake: has usage data, but no cpu data
