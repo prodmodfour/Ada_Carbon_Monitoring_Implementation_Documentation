@@ -6,7 +6,6 @@ First, clone the project and navigate into the source directory.
 
 ```sh
 git clone https://github.com/prodmodfour/Mock_Ada_Carbon_Monitoring_Implementation.git
-cd Mock_Ada_Carbon_Monitoring_Implementation/source
 ```
 
 ### 2\. Install Dependencies
@@ -16,13 +15,24 @@ Next, upgrade `pip` and then install the required packages listed in `requiremen
 ```sh
 python -m pip install -U pip
 pip install -r requirements.txt
+
+# SQLite > 3.31 is required, if on Rocky/Centos 8 it can be upgraded with the following:
+dnf remove sqlite
+dnf remove sqlite-libs
+
+wget http://repo.okay.com.mx/centos/8/x86_64/release/sqlite-libs-3.46.1-1.el8.x86_64.rpm
+wget http://repo.okay.com.mx/centos/8/x86_64/release/sqlite-3.46.1-1.el8.x86_64.rpm
+
+dnf install sqlite-libs-3.46.1-1.el8.x86_64.rpm
+dnf install sqlite-3.46.1-1.el8.x86_64.rpm
 ```
 
 ### 3\. Set Up the Database
 
-Run the following commands to create the necessary migrations and apply them.
+Navigate into the source directory and run the following commands to create the necessary migrations and apply them.
 
 ```sh
+cd Mock_Ada_Carbon_Monitoring_Implementation/source
 python manage.py makemigrations
 python manage.py migrate
 ```
