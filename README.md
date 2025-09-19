@@ -60,6 +60,8 @@ You'll need two separate terminal windows to run the full application.
 
     ```sh
     python manage.py runserver
+    # Can use the following to bind to public ip
+    python manage.py runserver 0.0.0.0:8000
     ```
 
 Once the server is running, you should be able to access the application in your web browser, typically at `http://127.0.0.1:8000`.
