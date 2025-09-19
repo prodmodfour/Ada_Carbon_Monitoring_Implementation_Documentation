@@ -1,7 +1,4 @@
 from datetime import datetime, timedelta, timezone
-import pyarrow
-from pyarrow import parquet
-import pandas as pd
 from data.helpers.PrometheusAPIClient import PrometheusAPIClient
 import requests
 import json
@@ -22,27 +19,6 @@ def refresh_project_data(cloud_project_name, start_timestamp, end_timestamp):
 
     print(f"Start timestamp: {start_timestamp}")
     print(f"End timestamp: {end_timestamp}")
-
-    # Construct filepath
-    filepath = f"data/{cloud_project_name}_estimated_usage.parquet"
-
-    # Construct temp file path
-    temp_filepath = f"data/{cloud_project_name}_estimated_usage_temp.parquet"
-
-    # Define the schema
-    defined_schema = pyarrow.schema([
-    pyarrow.field('timestamp', pyarrow.timestamp('ms', tz='UTC'), nullable=False),
-    pyarrow.field('busy_usage_cpu_seconds_total', pyarrow.float64()),
-    pyarrow.field('idle_usage_cpu_seconds_total', pyarrow.float64()),
-    pyarrow.field('busy_usage_kwh', pyarrow.float64()),
-    pyarrow.field('idle_usage_kwh', pyarrow.float64()),
-    pyarrow.field('busy_usage_gCO2eq', pyarrow.float64()),
-    pyarrow.field('idle_usage_gCO2eq', pyarrow.float64()),
-    pyarrow.field('status', pyarrow.string(), nullable=False)
-    ])
-
-    # Create a dataframe with the schema
-    df = pd.DataFrame(columns=defined_schema.names)
 
     # Create a Prometheus client
     prometheus_url = "https://host-172-16-100-248.nubes.stfc.ac.uk/"
