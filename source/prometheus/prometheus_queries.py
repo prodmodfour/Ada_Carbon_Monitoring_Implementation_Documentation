@@ -1,3 +1,12 @@
+import typing
+
+def to_rfc3339(date: datetime):
+    if date.tzinfo is None:
+        date = date.replace(tzinfo=timezone.utc)
+    else:
+        date = date.astimezone(timezone.utc)
+    return date.strftime('%Y-%m-%dT%H:%M:%SZ')
+
 
 def cpu_seconds_total(prometheus_client, timestamp, cloud_project_name, step = '1h'):
     query = f'increase(node_cpu_seconds_total{{cloud_project_name="{cloud_project_name}"}}[{step}])'
