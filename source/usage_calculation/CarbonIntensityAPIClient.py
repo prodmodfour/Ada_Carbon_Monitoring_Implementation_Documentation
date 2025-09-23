@@ -37,12 +37,14 @@ class CarbonIntensityAPIClient:
 
             # --- Calculate and return the average ---
             average_intensity = (intensity1 + intensity2) / 2
+            print(f"Average intensity: {average_intensity}")
             return average_intensity
+
 
         except requests.exceptions.RequestException as e:
             print(f"API request failed: {e}")
-            return None
+            return 0
         except (KeyError, IndexError) as e:
             # This can happen if the JSON structure is unexpected or empty
             print(f"Failed to parse data from API response: {e}")
-            return None
+            return 0
