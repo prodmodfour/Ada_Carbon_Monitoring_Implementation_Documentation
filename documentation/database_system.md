@@ -1,3 +1,28 @@
+# Data acquisition breakdown
+We store:
+* idle_cpu_seconds
+* busy_cpu_seconds
+* idle_kwh
+* busy_kwh
+* idle_gCo2eq
+* busy_gCo2eq
+
+We store data in a timeseries format for the last year. Data is stored in JSON files.
+
+We store this data for each:
+* Project
+* Experiment
+* Machine
+* User
+
+First, we download cpu_seconds data day by day. We make a request for an hours worth of cpu_seconds data.
+This gives us a JSON object with a number of timeseries. We parse this object and save its data to various storage classes.
+We have a usage storage class for each level of storage mentioned before. If the download fails, we store "failed" instead of a float.
+
+
+
+We seperate data into hourly, monthly and yearly so that we can easily load this data to our graphs.
+
 # EstimatedUsageDayEntry
 ```json
 {
