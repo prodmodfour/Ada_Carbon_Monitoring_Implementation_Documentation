@@ -8,11 +8,8 @@ import os
 import json
 
 def download_cpu_seconds_total(start_date: str = None, end_date: str = None):
-    # Input dates are in the format DD_MM_YYYY
-
-    # If no start date is provided, set it to 1 year ago
     if start_date is None:
-        start_date = datetime.now() - timedelta(days=185)
+        start_date = datetime(2025, 3, 20, 0, 0, 0)
     else:
         start_date = datetime.strptime(start_date, '%d_%m_%Y')
     
