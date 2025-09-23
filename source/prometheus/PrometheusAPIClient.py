@@ -1,7 +1,7 @@
 import requests
 
 class PrometheusAPIClient:
-    def __init__(self, prometheus_url, api_endpoint, timeout=120):
+    def __init__(self, prometheus_url = "https://host-172-16-100-248.nubes.stfc.ac.uk/", api_endpoint = "api/v1/query_range", timeout=120):
         if not prometheus_url.endswith("/"):
             prometheus_url = prometheus_url + "/"
         
