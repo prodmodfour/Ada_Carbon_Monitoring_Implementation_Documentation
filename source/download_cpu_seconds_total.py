@@ -12,7 +12,7 @@ def download_cpu_seconds_total(start_date: str = None, end_date: str = None):
 
     # If no start date is provided, set it to 1 year ago
     if start_date is None:
-        start_date = datetime.now() - timedelta(days=365)
+        start_date = datetime.now() - timedelta(days=185)
     else:
         start_date = datetime.strptime(start_date, '%d_%m_%Y')
     
@@ -50,6 +50,8 @@ def download_cpu_seconds_total_for_day(datetime_to_download: datetime, prometheu
 
         for project_label in project_labels:
             response = prometheus_queries.cpu_seconds_total(prometheus_client, datetime_to_download, project_label)
+            if not response:
+                continue
             project_data, machine_data = parse_prometheus_response(response, datetime_to_download)
 
             _add_to_project_data_timeseries(project_data, project_data_timeseries, datetime_to_download)
@@ -94,7 +96,7 @@ def parse_prometheus_response(response: dict, datetime: datetime):
 
 def _determine_usage_data_from_prometheus_response(response: dict, machine_data: dict, project_data: dict, datetime: datetime):
     carbon_intensity_api_client = CarbonIntensityAPIClient()
-    carbon_intensity = carbon_intensity_api_client.get_carbon_intensity(datetime)
+    
 
     for series in response["data"]["result"]:
         machine_label, cpu_mode = _determine_machine_label_and_cpu_mode(series)
@@ -112,6 +114,7 @@ def _determine_usage_data_from_prometheus_response(response: dict, machine_data:
                 "idle_gCo2eq": 0
             }
 
+        carbon_intensity = carbon_intensity_api_client.get_carbon_intensity(datetime)
         machine_data[machine_label]["intensity_gCo2eq/kwh"] = carbon_intensity
         project_data["intensity_gCo2eq/kwh"] = carbon_intensity
 
@@ -183,4 +186,4 @@ def _save_machine_data_day_entry(machine_data_timeseries: dict, datetime_to_down
 
 
 if __name__ == "__main__":
-    download_cpu_seconds_total_for_day(datetime.now() - timedelta(days=1), PrometheusAPIClient())
+    download_cpu_seconds_total()
