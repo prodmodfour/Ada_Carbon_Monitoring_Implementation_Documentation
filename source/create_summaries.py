@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 from datetime import datetime, timedelta
 import typing
+import calendar
 
 def create_day_summaries():
     start_datetime = datetime(2025, 3, 20, 0, 0, 0)
@@ -128,22 +129,52 @@ def _summarise_machines_day(base_file_path: str, project_label: str):
             json.dump(summary, json_file, indent=4)
 
 def create_month_summaries():
-    start_datetime = datetime(2025, 3, 0, 0, 0, 0)
+    start_month = 3
+    start_datetime = datetime(2025, start_month, 0, 0, 0, 0)
     data_root_directory = "data"
 
     current_datetime = start_datetime
     while current_datetime <= datetime.now():
-        month = current_datetime.strftime("%m")
-        base_file_path = f"{data_root_directory}/{month}/"
+        
         project_labels = ["IDAaaS", "CDAaaS"]
 
         for project_label in project_labels:
-            _summarise_project_month(base_file_path, project_label)
+            _summarise_project_month(data_root_directory, project_label, current_datetime)
             _summarise_machines_month(base_file_path, project_label)
-        current_datetime += timedelta(months=1)
+        
+        start_month += 1
+        current_datetime = datetime(2025, start_month, 0, 0, 0, 0)
 
-def _summarise_project_month(base_file_path: str, project_label: str):
-    pass
+def _summarise_project_month(data_root_directory: str, project_label: str, datetime: datetime):
+    month = datetime.strftime("%m")
+    base_file_path = f"{data_root_directory}/{month}/"
+
+    current_datetime = datetime
+    days_in_month = calendar.monthrange(2025, month)
+    while current_datetime < (datetime + timedelta(days=days_in_month)):
+        day = datetime.strftime("%d")
+        day_summary_file_path = f"{base_file_path}{day}"
+
+        data = None
+        try:
+            with open(day_summary_file_path, 'r') as file:
+                data = json.load(file)
+        except FileNotFoundError:
+            print(f"Error: The file '{day_summary_file_path}' was not found.")
+        except json.JSONDecodeError:
+            print(f"Error: The file '{day_summary_file_path}' contains invalid JSON.")
+        except PermissionError:
+            print("Permission error")
+        except OSError:
+            print("OS Error")
+
+        if data == None:
+            continue
+
+        
+        current_datetime += timedelta(days=1)
+
+
 
 def _summarise_machines_month(base_file_path: str, project_label: str):
     pass
