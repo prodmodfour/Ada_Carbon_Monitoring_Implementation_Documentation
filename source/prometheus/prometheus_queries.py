@@ -1,4 +1,6 @@
 import typing
+from datetime import datetime, timezone
+from PrometheusAPIClient import PrometheusAPIClient
 
 def to_rfc3339(date: datetime):
     if date.tzinfo is None:
@@ -21,3 +23,12 @@ def cpu_seconds_total(prometheus_client: PrometheusAPIClient, timestamp: datetim
     response = prometheus_client.query(parameters)
 
     return response
+
+
+if __name__ == "__main__":
+    prometheus_client = PrometheusAPIClient()
+    timestamp = datetime.now()
+    cloud_project_name = "CDAaaS"
+    step = '1h'
+    response = cpu_seconds_total(prometheus_client, timestamp, cloud_project_name, step)
+    print(response)
