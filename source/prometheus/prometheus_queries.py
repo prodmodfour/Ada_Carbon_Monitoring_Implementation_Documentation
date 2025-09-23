@@ -1,6 +1,6 @@
 import typing
 from datetime import datetime, timezone
-from PrometheusAPIClient import PrometheusAPIClient
+from prometheus.PrometheusAPIClient import PrometheusAPIClient
 
 def to_rfc3339(date: datetime):
     if date.tzinfo is None:
