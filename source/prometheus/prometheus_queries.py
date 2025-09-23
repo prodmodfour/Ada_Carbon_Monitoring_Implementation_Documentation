@@ -8,7 +8,7 @@ def to_rfc3339(date: datetime):
     return date.strftime('%Y-%m-%dT%H:%M:%SZ')
 
 
-def cpu_seconds_total(prometheus_client, timestamp, cloud_project_name, step = '1h'):
+def cpu_seconds_total(prometheus_client: PrometheusAPIClient, timestamp: datetime, cloud_project_name: str, step = '1h'):
     query = f'increase(node_cpu_seconds_total{{cloud_project_name="{cloud_project_name}"}}[{step}])'
 
     parameters = {
