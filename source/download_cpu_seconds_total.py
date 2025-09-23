@@ -97,7 +97,7 @@ def parse_prometheus_response(response: dict, datetime: datetime):
 def _determine_usage_data_from_prometheus_response(response: dict, machine_data: dict, project_data: dict, datetime: datetime):
     carbon_intensity_api_client = CarbonIntensityAPIClient()
     
-
+    carbon_intensity = carbon_intensity_api_client.get_carbon_intensity(datetime)
     for series in response["data"]["result"]:
         machine_label, cpu_mode = _determine_machine_label_and_cpu_mode(series)
 
@@ -114,7 +114,7 @@ def _determine_usage_data_from_prometheus_response(response: dict, machine_data:
                 "idle_gCo2eq": 0
             }
 
-        carbon_intensity = carbon_intensity_api_client.get_carbon_intensity(datetime)
+        
         machine_data[machine_label]["intensity_gCo2eq/kwh"] = carbon_intensity
         project_data["intensity_gCo2eq/kwh"] = carbon_intensity
 
