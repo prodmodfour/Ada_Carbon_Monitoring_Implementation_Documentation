@@ -82,7 +82,7 @@ def _determine_machine_label_and_cpu_mode(series: dict):
 
 
 
-def parse_prometheus_response(response: dict, datetime: datetime):
+def parse_prometheus_response(response: dict, dt: datetime):
     project_data = {
         "busy_cpu_seconds_total": 0,
         "idle_cpu_seconds_total": 0,
@@ -94,14 +94,14 @@ def parse_prometheus_response(response: dict, datetime: datetime):
     }
     machine_data = dict()
 
-    _determine_usage_data_from_prometheus_response(response, machine_data, project_data, datetime)
+    _determine_usage_data_from_prometheus_response(response, machine_data, project_data, dt)
 
     return project_data, machine_data
 
-def _determine_usage_data_from_prometheus_response(response: dict, machine_data: dict, project_data: dict, datetime: datetime):
+def _determine_usage_data_from_prometheus_response(response: dict, machine_data: dict, project_data: dict, dt: datetime):
     carbon_intensity_api_client = CarbonIntensityAPIClient()
     
-    carbon_intensity = carbon_intensity_api_client.get_carbon_intensity(datetime)
+    carbon_intensity = carbon_intensity_api_client.get_carbon_intensity(dt)
     for series in response["data"]["result"]:
         machine_label, cpu_mode = _determine_machine_label_and_cpu_mode(series)
 
@@ -147,12 +147,12 @@ def _determine_usage_data_from_prometheus_response(response: dict, machine_data:
             project_data["busy_gCo2eq"] += busy_gCo2eq
 
 
-def _add_to_project_data_timeseries(project_data: dict, project_data_timeseries: dict, datetime: datetime):
-    time_string = datetime.strftime("%H:%M")
+def _add_to_project_data_timeseries(project_data: dict, project_data_timeseries: dict, dt: datetime):
+    time_string = dt.strftime("%H:%M")
     project_data_timeseries[time_string] = project_data
 
-def _add_to_machine_data_timeseries(machine_data: dict, machine_data_timeseries: dict, datetime: datetime):
-    time_string = datetime.strftime("%H:%M")
+def _add_to_machine_data_timeseries(machine_data: dict, machine_data_timeseries: dict, dt: datetime):
+    time_string = dt.strftime("%H:%M")
     machine_data_timeseries[time_string] = machine_data
     
 
