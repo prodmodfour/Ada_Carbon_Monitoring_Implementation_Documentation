@@ -33,30 +33,37 @@ def download_cpu_seconds_total(start_date: str = None, end_date: str = None):
         # Download the data for the current day
         download_cpu_seconds_total_for_day(date, prometheus_client)
 
-def download_cpu_seconds_total_for_day(datetime_to_download: datetime, prometheus_client: PrometheusAPIClient):
-    project_labels = [ "CDAaaS", "IDAaaS"]
-    datetime_to_download = datetime_to_download.replace(hour=0, minute=0, second=0, microsecond=0)
-
-    project_data_timeseries = dict()
-    machine_data_timeseries = dict()
+def download_cpu_seconds_total_for_day(datetime_to_download: datetime, prometheus_client: "PrometheusAPIClient"):
+    project_labels = ["CDAaaS", "IDAaaS"]
     
-    
-    for hour in range(24):
-        if datetime_to_download >= datetime.now():
-            break
+    day_to_process = datetime_to_download.replace(hour=0, minute=0, second=0, microsecond=0)
 
-        for project_label in project_labels:
-            response = prometheus_queries.cpu_seconds_total(prometheus_client, datetime_to_download, project_label)
-            if not response:
-                continue
-            project_data, machine_data = parse_prometheus_response(response, datetime_to_download)
+    for project_label in project_labels:
+        project_data_timeseries = dict()
+        machine_data_timeseries = dict()
+        
+        current_timestamp = day_to_process
 
-            _add_to_project_data_timeseries(project_data, project_data_timeseries, datetime_to_download)
-            _add_to_machine_data_timeseries(machine_data, machine_data_timeseries, datetime_to_download)
-        datetime_to_download += timedelta(hours=1)
 
-    _save_project_data_day_entry(project_data_timeseries, datetime_to_download, project_label)
-    _save_machine_data_day_entry(machine_data_timeseries, datetime_to_download, project_label)
+        for _ in range(24):
+            if current_timestamp >= datetime.now():
+                break
+
+            response = prometheus_queries.cpu_seconds_total(prometheus_client, current_timestamp, project_label)
+            
+            if response:
+                project_data, machine_data = parse_prometheus_response(response, current_timestamp)
+                _add_to_project_data_timeseries(project_data, project_data_timeseries, current_timestamp)
+                _add_to_machine_data_timeseries(machine_data, machine_data_timeseries, current_timestamp)
+            
+
+            current_timestamp += timedelta(hours=1)
+
+        if project_data_timeseries:
+            _save_project_data_day_entry(project_data_timeseries, day_to_process, project_label)
+        if machine_data_timeseries:
+            _save_machine_data_day_entry(machine_data_timeseries, day_to_process, project_label)
+
 
 
 
