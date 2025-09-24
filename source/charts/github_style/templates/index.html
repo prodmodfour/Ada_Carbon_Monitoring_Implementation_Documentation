@@ -2,17 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <title>Carbon Usage Heatmap</title>
 
   <!-- Tailwind (CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <style>
-    /* Tooltip */
     .tooltip {
       position: absolute;
       pointer-events: none;
@@ -45,10 +41,7 @@
       </div>
     </div>
 
-    <!-- Month labels -->
-    <div id="month-labels" class="flex text-xs text-gray-500 mb-2 gap-4 flex-wrap"></div>
-
-    <!-- SVG Heatmap (responsive; no inner scrollbars) -->
+    <!-- Single responsive SVG (month labels drawn inside it) -->
     <div class="relative">
       <svg id="heatmap" class="block w-full h-auto"></svg>
       <div id="tooltip" class="tooltip"></div>
