@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  />
+  <title>Carbon Usage Heatmap</title>
+
+  <!-- Tailwind (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    /* Tooltip */
+    .tooltip {
+      position: absolute;
+      pointer-events: none;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.5rem;
+      padding: 0.5rem 0.625rem;
+      font-size: 0.875rem;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.07), 0 6px 6px rgba(0,0,0,0.05);
+      display: none;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 sm:p-6 md:p-8 font-sans">
+  <div class="max-w-6xl mx-auto bg-white rounded-2xl shadow-lg p-5 sm:p-8">
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
+      <div>
+        <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">Carbon Usage Heatmap</h1>
+        <p class="text-gray-500">GitHub-style year view · each square is a day</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <label for="year" class="text-sm font-medium text-gray-700">Year</label>
+        <input id="year" type="number" class="w-28 p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+               min="2010" max="2100" value="{{ default_year }}">
+        <button id="reload"
+                class="px-4 py-2 rounded-xl bg-blue-600 text-white font-medium shadow hover:shadow-md transition">
+          Load
+        </button>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <!-- Month labels -->
+      <div id="month-labels" class="flex text-xs text-gray-500 mb-1"></div>
+
+      <!-- SVG Heatmap -->
+      <div class="relative">
+        <svg id="heatmap" class="block"></svg>
+        <div id="tooltip" class="tooltip"></div>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="mt-6 flex items-center gap-3 text-sm text-gray-600">
+      <span>Lower</span>
+      <div class="flex items-center gap-1">
+        <span class="inline-block w-4 h-4 rounded" style="background:#22c55e"></span>
+        <span class="inline-block w-4 h-4 rounded" style="background:#84cc16"></span>
+        <span class="inline-block w-4 h-4 rounded" style="background:#f59e0b"></span>
+        <span class="inline-block w-4 h-4 rounded" style="background:#ef4444"></span>
+      </div>
+      <span>Higher carbon (gCO2eq)</span>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
