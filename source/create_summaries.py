@@ -70,7 +70,7 @@ def _summarise_project_day(base_file_path: str, project_label: str):
         json.dump(summary, json_file, indent=4)
 
 def _summarise_machines_day(base_file_path: str, project_label: str):
-    file_path = f"{base_file_path}{project_label}_timeseries.json"
+    file_path = f"{base_file_path}{project_label}_machine_timeseries.json"
     data = None
   
     try:
@@ -195,5 +195,3 @@ def _summarise_machines_year(base_file_path: str, project_label: str):
 
 if __name__== "__main__":
     create_day_summaries()
-    create_month_summaries()
-    create_year_summaries()
