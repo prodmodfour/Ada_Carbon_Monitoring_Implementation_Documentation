@@ -41,13 +41,11 @@
       </div>
     </div>
 
-    <!-- Single responsive SVG (month labels drawn inside it) -->
     <div class="relative">
       <svg id="heatmap" class="block w-full h-auto"></svg>
       <div id="tooltip" class="tooltip"></div>
     </div>
 
-    <!-- Legend -->
     <div class="mt-6 flex items-center gap-3 text-sm text-gray-600">
       <span>Lower</span>
       <div class="flex items-center gap-1">
@@ -56,9 +54,35 @@
         <span class="inline-block w-4 h-4 rounded" style="background:#f59e0b"></span>
         <span class="inline-block w-4 h-4 rounded" style="background:#ef4444"></span>
       </div>
-      <span>Higher carbon (gCO2eq)</span>
+      <span>Higher carbon (gCO₂e)</span>
     </div>
   </div>
+
+  <!--
+    OPTIONAL CONFIG (no new UI; set entirely in code):
+    - Provide your own data by month. Keys can be "January".."December", "Jan".."Dec", or 1..12.
+    - Each array is per-day values for that month; missing days default to 0; extra items are ignored.
+    - Set MAX_REDNESS to control the color scale's top value. If null/undefined, it auto-uses the data max.
+  -->
+  <script>
+    // Example: replace with your own data. Leave as {} to use server mock data.
+    window.CUSTOM_DATA = {
+      "January": [],   
+      "February": [],
+      "March": [25, 12, 65, 39, 55, 41, 71, 58, 46, 33, 50, 61, 44, 59, 28, 68, 51, 47, 36, 56, 63, 49, 75, 42, 53, 57, 31, 66, 45, 60, 54],
+      "April": [],
+      "May": [],
+      "June": [],
+      "July": [],
+      "August": [],
+      "September": [],
+      "October": [],
+      "November": [],
+      "December": []
+    };
+    // Controls the color scale. Example: 120000 (gCO2e). Set to null to auto-scale from data.
+    window.MAX_REDNESS = 100;
+  </script>
 
   <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>

@@ -14,6 +14,7 @@ def data():
     """
     Returns mock daily carbon usage for the requested year:
     { year: 2025, days: [{date: "2025-01-01", value: 1234.5}, ...], max: <maxValue> }
+    This still works as a fallback when CUSTOM_DATA is not provided in index.html.
     """
     year = int(request.args.get("year", date.today().year))
 
@@ -30,7 +31,6 @@ def data():
     for i in range(n_days):
         d = start + timedelta(days=i)
         # Seasonal-ish fake pattern + noise (gCO2eq)
-        # Winter higher, summer lower, with weekday/weekend variation
         month = d.month
         base = {
             12: 120000, 1: 120000, 2: 110000,
