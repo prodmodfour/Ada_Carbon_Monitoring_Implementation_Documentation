@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  />
+  <title>Energy Consumption Dashboard</title>
+
+  <!-- Tailwind (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Chart.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 sm:p-6 md:p-8 font-sans">
+  <div class="max-w-7xl mx-auto bg-white rounded-2xl shadow-lg p-4 sm:p-6">
+    <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-6 text-center">
+      Energy Consumption Dashboard
+    </h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 items-end">
+      <!-- Data Type -->
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-gray-700">Data Type</label>
+        <div id="dataTypeTabs" class="flex bg-gray-200 rounded-lg p-1">
+          <button data-value="electricity"
+                  class="tab-btn w-full text-center px-4 py-2 rounded-md transition-colors duration-300 ease-in-out">
+            Electricity
+          </button>
+          <button data-value="carbon"
+                  class="tab-btn w-full text-center px-4 py-2 rounded-md transition-colors duration-300 ease-in-out">
+            Carbon
+          </button>
+        </div>
+      </div>
+
+      <!-- Time View -->
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-gray-700">Time View</label>
+        <div id="timeViewTabs" class="flex bg-gray-200 rounded-lg p-1">
+          <button data-value="day"
+                  class="tab-btn w-full text-center px-4 py-2 rounded-md transition-colors duration-300 ease-in-out">
+            Day
+          </button>
+          <button data-value="month"
+                  class="tab-btn w-full text-center px-4 py-2 rounded-md transition-colors duration-300 ease-in-out">
+            Month
+          </button>
+          <button data-value="year"
+                  class="tab-btn w-full text-center px-4 py-2 rounded-md transition-colors duration-300 ease-in-out">
+            Year
+          </button>
+        </div>
+      </div>
+
+      <!-- Pickers -->
+      <div class="flex flex-col gap-2" id="pickers">
+        <!-- Day picker -->
+        <label for="day-select" class="text-sm font-medium text-gray-700">Select Day</label>
+        <input type="date" id="day-select"
+               class="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
+
+        <!-- Month picker -->
+        <label for="month-select" class="text-sm font-medium text-gray-700 hidden">Select Month</label>
+        <input type="month" id="month-select" min="2025-01" max="2025-12"
+               class="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 hidden" />
+
+        <!-- Year display -->
+        <label class="text-sm font-medium text-gray-700 hidden" id="year-label">Year</label>
+        <div class="w-full p-2 border border-gray-200 bg-gray-50 rounded-lg text-gray-700 hidden" id="year-value">
+          2025
+        </div>
+      </div>
+    </div>
+
+    <div class="relative h-[60vh]">
+      <canvas id="chartCanvas"></canvas>
+    </div>
+  </div>
+
+  <!-- App JS -->
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
