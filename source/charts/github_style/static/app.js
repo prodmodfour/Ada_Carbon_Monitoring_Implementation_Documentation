@@ -1,20 +1,17 @@
-// --- Config ---
-const CELL = 14;          // size of a day square (px)
-const GAP = 3;            // gap between squares (px)
-const PADDING_TOP = 18;   // top padding to fit month labels (px)
-const PADDING_LEFT = 24;  // left padding to fit weekday labels if needed
+// --- Config (larger cells) ---
+const CELL = 18;          // size of a day square (px)
+const GAP = 4;            // gap between squares (px)
+const PADDING_TOP = 24;   // top padding to fit month labels (px)
+const PADDING_LEFT = 36;  // left padding to fit weekday labels if needed
 const ROWS = 7;           // Sun..Sat
 
 // Color scale: green -> orange -> red
 function colorFor(value, max) {
   if (value <= 0 || !isFinite(max) || max <= 0) return "#e5e7eb"; // light gray for 0/invalid
   const r = value / max; // 0..1
-  // We’ll map 0..0.5 to green->orange, 0.5..1 to orange->red
   if (r <= 0.5) {
-    // interpolate green (#22c55e) to orange (#f59e0b)
     return lerpColor("#22c55e", "#f59e0b", r / 0.5);
   } else {
-    // interpolate orange (#f59e0b) to red (#ef4444)
     return lerpColor("#f59e0b", "#ef4444", (r - 0.5) / 0.5);
   }
 }
@@ -58,7 +55,6 @@ function fmtNumber(n) {
 }
 
 function formatDateISO(d) {
-  // yyyy-mm-dd
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
@@ -84,21 +80,23 @@ function renderHeatmap(data) {
   const nDays = Math.round((calEnd - calStart) / (1000 * 60 * 60 * 24)) + 1;
   const weeks = Math.ceil(nDays / 7);
 
-  // Size svg
-  const width = PADDING_LEFT + weeks * (CELL + GAP) - GAP + 8; // little extra padding
+  // Compute intrinsic size
+  const width = PADDING_LEFT + weeks * (CELL + GAP) - GAP + 8;
   const height = PADDING_TOP + ROWS * (CELL + GAP) - GAP + 8;
 
-  svg.setAttribute("width", width);
-  svg.setAttribute("height", height);
+  // Make the SVG responsive: scale to container width (no inner scrollbars)
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.removeAttribute("width");
+  svg.removeAttribute("height");
   svg.innerHTML = "";
 
-  // Month labels (render in a separate flex row for responsive spacing)
+  // Month labels (simple row; not strictly aligned to columns, but responsive)
   const monthLabels = document.getElementById("month-labels");
   monthLabels.innerHTML = "";
   for (let m = 0; m < 12; m++) {
     const label = document.createElement("div");
     label.textContent = monthNames()[m];
-    label.className = "w-16 text-center";
+    label.className = "px-1";
     monthLabels.appendChild(label);
   }
 
@@ -112,7 +110,7 @@ function renderHeatmap(data) {
       const iso = formatDateISO(d);
       const inYear = d.getFullYear() === year;
       const value = values.get(iso) || 0;
-      const fill = inYear ? colorFor(value, max) : "#f3f4f6"; // pale gray for out-of-year cells
+      const fill = inYear ? colorFor(value, max) : "#f3f4f6";
 
       const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
       rect.setAttribute("x", x);
