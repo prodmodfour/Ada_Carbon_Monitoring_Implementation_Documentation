@@ -54,14 +54,36 @@ def _summarise_project_day(base_file_path: str, project_label: str):
         busy_gCo2eq.append(values["busy_gCo2eq"])
         idle_gCo2eq.append(values["idle_gCo2eq"])
 
+        sum_busy_kwh = sum(busy_kwh)
+        sum_idle_kwh = sum(idle_kwh)
+        sum_intensities = sum(intensities)
+        number_data_points = len(intensities)
+
+        average_intensity = 0
+        if number_data_points == 0:
+            average_intensity = 0
+        else:
+            average_intensity = sum_intensities / number_data_points
+
+        sum_busy_gCo2eq = sum(busy_gCo2eq)
+        sum_idle_gCo2eq = sum(idle_gCo2eq)
+
+        idle_percentage_kwh = 0
+        idle_percentage_gCo2eq = 0
+        if (sum_busy_kwh + sum_idle_kwh) == 0 or (sum_busy_gCo2eq + sum_idle_gCo2eq) == 0:
+            idle_percentage_kwh = 0
+            idle_percentage_gCo2eq = 0
+        else:
+            idle_percentage_kwh = (sum_idle_kwh / (sum_busy_kwh + sum_idle_kwh) * 100)
+            idle_percentage_gCo2eq = (sum_idle_gCo2eq / (sum_busy_gCo2eq + sum_idle_gCo2eq) * 100)
     summary = {
-        "total_busy_kwh": sum(busy_kwh),
-        "total_idle_kwh": sum(idle_kwh),
-        "average_intensity_gCo2eq/kwh": sum(intensities) / len(intensities),
-        "total_busy_gCo2eq": sum(busy_gCo2eq),
-        "total_idle_gCo2eq": sum(idle_gCo2eq),
-        "idle_percentage_kwh": (sum(idle_kwh) / (sum(busy_kwh) + sum(idle_kwh)) * 100),
-        "idle_percentage_gCo2eq": (sum(idle_gCo2eq) / (sum(busy_gCo2eq) + sum(idle_gCo2eq)) * 100)
+        "total_busy_kwh": sum_busy_kwh,
+        "total_idle_kwh": sum_idle_kwh,
+        "average_intensity_gCo2eq/kwh": average_intensity,
+        "total_busy_gCo2eq": sum_busy_gCo2eq,
+        "total_idle_gCo2eq": sum_idle_gCo2eq,
+        "idle_percentage_kwh": idle_percentage_kwh,
+        "idle_percentage_gCo2eq": idle_percentage_gCo2eq
     }
 
     save_file_path = f"{base_file_path}{project_label}_summary.json"
@@ -113,15 +135,25 @@ def _summarise_machines_day(base_file_path: str, project_label: str):
         number_data_points = len(machine_totals[machine_name]["intensities"])
         sum_busy_gCo2eq = sum(machine_totals[machine_name]["busy_gCo2eq"])
         sum_idle_gCo2eq = sum(machine_totals[machine_name]["idle_gCo2eq"])
+
+        idle_percentage_kwh = 0
+        idle_percentage_gCo2eq = 0
+        if (sum_busy_kwh + sum_idle_kwh) == 0 or (sum_busy_gCo2eq + sum_idle_gCo2eq) == 0:
+            idle_percentage_kwh = 0
+            idle_percentage_gCo2eq = 0
+        else:
+            idle_percentage_kwh = (sum_idle_kwh / (sum_busy_kwh + sum_idle_kwh) * 100)
+            idle_percentage_gCo2eq = (sum_idle_gCo2eq / (sum_busy_gCo2eq + sum_idle_gCo2eq) * 100)
         summary = {
             "total_busy_kwh": sum_busy_kwh,
             "total_idle_kwh": sum_idle_kwh,
             "average_intensity_gCo2eq/kwh": sum_intensities / number_data_points,
             "total_busy_gCo2eq": sum_busy_gCo2eq,
             "total_idle_gCo2eq": sum_idle_gCo2eq,
-            "idle_percentage_kwh": (sum_idle_kwh / (sum_busy_kwh + sum_idle_kwh) * 100),
-            "idle_percentage_gCo2eq": (sum_idle_gCo2eq / (sum_busy_gCo2eq + sum_idle_gCo2eq) * 100)
+            "idle_percentage_kwh": (idle_percentage_kwh),
+            "idle_percentage_gCo2eq": (idle_percentage_gCo2eq)
         }
+
 
         save_file_path = f"{base_file_path}{project_label}_{machine_name}_machine_summary.json"
 
