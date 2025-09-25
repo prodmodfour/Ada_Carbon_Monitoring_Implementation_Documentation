@@ -7,6 +7,9 @@ from usage_calculation.CarbonIntensityAPIClient import CarbonIntensityAPIClient
 import os
 import json
 
+IDLE_WATTS = 1
+BUSY_WATTS = 12  
+
 def download_cpu_seconds_total(start_date: str = None, end_date: str = None):
     if start_date is None:
         start_date = datetime(2025, 3, 20, 0, 0, 0)
@@ -127,7 +130,7 @@ def _determine_usage_data_from_prometheus_response(response: dict, machine_data:
             machine_data[machine_label]["idle_cpu_seconds_total"] += cpu_seconds
             project_data["idle_cpu_seconds_total"] += cpu_seconds
 
-            idle_kwh = usage_calculation_functions.estimate_electricity_usage_kwh(cpu_seconds, 0.1)
+            idle_kwh = usage_calculation_functions.estimate_electricity_usage_kwh(cpu_seconds, IDLE_WATTS)
             machine_data[machine_label]["idle_kwh"] += idle_kwh
             project_data["idle_kwh"] += idle_kwh
 
@@ -138,7 +141,7 @@ def _determine_usage_data_from_prometheus_response(response: dict, machine_data:
             machine_data[machine_label]["busy_cpu_seconds_total"] += cpu_seconds
             project_data["busy_cpu_seconds_total"] += cpu_seconds
 
-            busy_kwh = usage_calculation_functions.estimate_electricity_usage_kwh(cpu_seconds, 12)
+            busy_kwh = usage_calculation_functions.estimate_electricity_usage_kwh(cpu_seconds, BUSY_WATTS)
             machine_data[machine_label]["busy_kwh"] += busy_kwh
             project_data["busy_kwh"] += busy_kwh
 
