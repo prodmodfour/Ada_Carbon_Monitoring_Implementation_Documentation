@@ -25,3 +25,11 @@ layout: default
 * Jekyll
 * Mermaid.js
 
+## Green Computing
+
+## Building the database
+
+## Implementations
+
+
+
