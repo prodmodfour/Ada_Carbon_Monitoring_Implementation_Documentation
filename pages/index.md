@@ -5,28 +5,28 @@ nav_order: 1
 nav_exclude: false     
 ---
 
-# Table of Contents
 
-## Software used
-### Databases
+
+# Software used
+## Databases
 * Prometheus
 * MongoDB
 * SQLite
-### Languages
+## Languages
 * Python
 * JavaScript
-### Frontend
+## Frontend
 * Svelte
 * Chart.js
-### Backend
+## Backend
 * Flask
-### Documentation
+## Documentation
 * Jekyll
 * Mermaid.js
 
-## Building the database
+# Building the database
 
-## Implementations
+# Implementations
 
 
 
