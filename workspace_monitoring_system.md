@@ -1,3 +1,8 @@
+---
+title: Workplace Monitoring System 
+nav_order: 3       
+nav_exclude: false     
+---
 # Workspace System — Quick Guide
 
 This note explains how the **workspace** metrics are collected, stored, and displayed for each site (**clf**, **isis**, **diamond**).

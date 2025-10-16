@@ -1,3 +1,9 @@
+---
+title: Database System     
+nav_order: 2         
+nav_exclude: false     
+---
+
 # Data acquisition breakdown
 We store:
 * idle_cpu_seconds
