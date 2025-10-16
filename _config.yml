@@ -1,2 +1,11 @@
 title: Ada Platform Carbon Monitoring Implementation Documentation
 description: A set of documents describing the implementation of carbon monitoring in the Ada Platform.
+remote_theme: cotes2020/jekyll-theme-chirpy
+
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+  - jekyll-archives
+  - jekyll-sitemap
+  - jekyll-paginate
+  - jekyll-include-cache
