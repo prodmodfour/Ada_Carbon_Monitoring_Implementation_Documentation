@@ -8,6 +8,8 @@ nav_exclude: false
 
 
 # Software used
+## APIs
+* Carbon Intensity API
 ## Databases
 * Prometheus
 * MongoDB
