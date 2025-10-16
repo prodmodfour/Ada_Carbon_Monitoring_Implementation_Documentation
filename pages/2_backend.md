@@ -5,6 +5,16 @@ nav_exclude: false
 ---
 
 # Database Structure
+# Database Classes
+## Prometheus Request Class
+We have a Prometheus request class that handles requests to the Prometheus API. This class is used to download cpu_seconds data for a given time period.
+## MongoDB Request Class
+We have a MongoDB request class that handles requests to the MongoDB database. This class is used to store and retrieve estimated usage data.
+## Carbon Intensity API Request Class
+We have a Carbon Intensity API request class that handles requests to the Carbon Intensity API. This class is used to get the carbon intensity for a given time period.
+## SQLite Class
+We have a SQLite class that handles requests to the SQLite database. This class is used to store and retrieve machine averages data.
+
 # Estimating Usage
 We estimate usage by downloading cpu_seconds data from Prometheus. We then use machine averages to estimate energy usage and carbon footprint.
 

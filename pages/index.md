@@ -32,6 +32,11 @@ nav_exclude: false
 
 # [Backend]({{ site.baseurl }}{% link pages/2_backend.md %})
 ## [Database Structure]({{ site.baseurl }}{% link pages/2_backend.md %}#database-structure)
+## Database Classes
+### [Prometheus Request Class]({{ site.baseurl }}{% link pages/2_backend.md %}#prometheus-request-class)
+### [MongoDB Request Class]({{ site.baseurl }}{% link pages/2_backend.md %}#mongodb-request-class)
+### [Carbon Intensity API Request Class]({{ site.baseurl }}{% link pages/2_backend.md %}#carbon-intensity-api-request-class)
+### [ SQLite Class ]({{ site.baseurl }}{% link pages/2_backend.md %}#sqlite-class)
 ## [Estimating Usage]({{ site.baseurl }}{% link pages/2_backend.md %}#estimating-usage)
 ### [Electricity]({{ site.baseurl }}{% link pages/2_backend.md %}#electricity)
 ### [Carbon Footprint]({{ site.baseurl }}{% link pages/2_backend.md %}#carbon-footprint)
