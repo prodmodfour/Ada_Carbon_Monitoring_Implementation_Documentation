@@ -2,7 +2,8 @@
 layout: page
 title: Table of Contents  
 nav_order: 1
-nav_exclude: false     
+nav_exclude: false
+permalink: /
 ---
 
 # [Green Computing Basics]({{ site.baseurl }}{% link pages/0_green_computing_basics.md %})
