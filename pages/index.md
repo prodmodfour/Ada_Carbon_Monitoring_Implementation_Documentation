@@ -5,6 +5,12 @@ nav_order: 1
 nav_exclude: false     
 ---
 
+# [Green Computing Basics]({{ site.baseurl }}{% link pages/0_green_computing_basics.md %})
+## [ Electricity Usage ]({{ site.baseurl }}{% link pages/0_green_computing_basics.md %}#electricity-usage)
+## [ Carbon Intensity ]({{ site.baseurl }}{% link pages/0_green_computing_basics.md %}#carbon-intensity)
+## [ Carbon Footprint ]({{ site.baseurl }}{% link pages/0_green_computing_basics.md %}#carbon-footprint)
+
+
 # [Software Used]({{ site.baseurl }}{% link pages/1_software_used.md %})
 ## [APIs]({{ site.baseurl }}{% link pages/1_software_used.md %}#apis)
 ### [Carbon Intensity API]({{ site.baseurl }}{% link pages/1_software_used.md %}#carbon-intensity-api)

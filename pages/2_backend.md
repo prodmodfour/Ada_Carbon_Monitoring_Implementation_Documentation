@@ -1,14 +1,31 @@
 ---
 title: Backend
-nav_order: 3       
+nav_order: 4    
 nav_exclude: false     
 ---
 
 # Database Structure
 # Estimating Usage
 We estimate usage by downloading cpu_seconds data from Prometheus. We then use machine averages to estimate energy usage and carbon footprint.
+
+The purpose of this project is to provide the users of Ada with information that may lead them towards making greener choices in the future. 
+We want users to know what impact they're having on the environment and what they can do reduce their impact.
+
+To achieve this, there are three main variables that we need to make the user aware of.
+These are:
+* Electricity Usage
+* Carbon Intensity
+* Carbon Footprint
+
+If users are aware of how their actions affect these three variables, they will be armed with the information necessary
+to make the greenes choicest possible. They will be able to minimise their carbon footprint
+
+
+
 ## Electricity
-We estimate electricity usage using machine averages. We multiply the cpu_seconds by the machine average kwh per cpu_second.
+We estimate electricity usage using machine averages. We multiply the cpu_seconds by the average power consumption of the machine (kW).
+## Carbon Intensity
+We get the carbon intensity from the Carbon Intensity API. This gives us the carbon intensity (gCo2eq per kwh) for a given time period.
 ## Carbon Footprint
 We estimate carbon footprint using the Carbon Intensity API. We multiply the estimated kwh by the carbon intensity (gCo2eq per kwh).
 # Workspace Tracking
