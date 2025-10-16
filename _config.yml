@@ -16,3 +16,6 @@ color_scheme: dark
 
 mermaid:
   version: "10.9.1"
+
+url: "https://prodmodfour.github.io"
+baseurl: "/Ada_Carbon_Monitoring_Implementation_Documentation"
