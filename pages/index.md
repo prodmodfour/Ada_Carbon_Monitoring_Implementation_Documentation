@@ -5,8 +5,6 @@ nav_order: 1
 nav_exclude: false     
 ---
 
-
-
 # Software used
 ## APIs
 * Carbon Intensity API
@@ -32,10 +30,18 @@ nav_exclude: false
 ### Electricity
 ### Carbon Footprint
 ## Workspace Tracking
-## 
+## Machine Averages
+## Group Attribution
+## User Attribution
 
 
 # Frontend
+## Carbon Intensity Forecast
+## Estimated Usage Graph
+## Github Commit History Style Heatmap
+## Workspace Card
+## Machine Sizes
+## Carbon Equivalents
 
 
 
