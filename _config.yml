@@ -13,3 +13,6 @@ plugins:
 
 search_enabled: true
 color_scheme: dark
+
+mermaid:
+  version: "10.9.1"
