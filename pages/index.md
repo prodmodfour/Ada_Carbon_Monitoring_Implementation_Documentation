@@ -26,9 +26,16 @@ nav_exclude: false
 * Jekyll
 * Mermaid.js
 
-# Building the database
+# Backend
+## Database Structure
+## Estimating usage
+### Electricity
+### Carbon Footprint
+## Workspace Tracking
+## 
 
-# Implementations
+
+# Frontend
 
 
 
