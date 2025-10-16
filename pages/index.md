@@ -5,7 +5,7 @@ nav_order: 1
 nav_exclude: false     
 ---
 
-[Software Used]({% link pages/1_software_used.md %})
+# [Software Used]({% link pages/1_software_used.md %})
 ## APIs
 * Carbon Intensity API
 ## Databases
@@ -24,7 +24,7 @@ nav_exclude: false
 * Jekyll
 * Mermaid.js
 
-[Backend]({% link pages/2_backend.md %})
+# [Backend]({% link pages/2_backend.md %})
 ## Database Structure
 ## Estimating usage
 ### Electricity
@@ -35,7 +35,7 @@ nav_exclude: false
 ## User Attribution
 
 
-[Frontend]({% link pages/3_frontend.md %})
+# [Frontend]({% link pages/3_frontend.md %})
 ## Carbon Intensity Forecast
 ## Estimated Usage Graph
 ## Github Commit History Style Heatmap
