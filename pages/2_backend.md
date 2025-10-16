@@ -4,6 +4,23 @@ nav_order: 3
 nav_exclude: false     
 ---
 
+# Database Structure
+# Estimating Usage
+We estimate usage by downloading cpu_seconds data from Prometheus. We then use machine averages to estimate energy usage and carbon footprint.
+## Electricity
+We estimate electricity usage using machine averages. We multiply the cpu_seconds by the machine average kwh per cpu_second.
+## Carbon Footprint
+We estimate carbon footprint using the Carbon Intensity API. We multiply the estimated kwh by the carbon intensity (gCo2eq per kwh).
+# Workspace Tracking
+We track workspaces by polling Prometheus for active hosts. We estimate their energy usage and carbon footprint using a power model and the Carbon Intensity API.
+# Machine Averages
+We store machine averages in a SQLite database. We use these averages to estimate energy usage and carbon footprint.
+# Group Attribution
+We attribute usage to groups based on the cloud_project_name. We store usage data for each group in a MongoDB database.
+# User Attribution
+We attribute usage to users based on the user label in Prometheus. We store usage data for each user in a MongoDB database.
+
+
 # Data acquisition breakdown
 We store:
 * idle_cpu_seconds
