@@ -6,398 +6,393 @@ nav_exclude: false
 
 # Database Structure
 ## SQL Tables and Views
-''' sql
--- ========== DIMENSIONS ==========
-CREATE TABLE dim_project (
-  project_id        BIGSERIAL PRIMARY KEY,
-  cloud_project_name TEXT UNIQUE NOT NULL
-);
+'''sql
+-- === Dimension tables ===
 
 CREATE TABLE dim_group (
-  group_id   BIGSERIAL PRIMARY KEY,
-  group_name TEXT UNIQUE NOT NULL
+  group_id     INTEGER PRIMARY KEY,
+  group_name   TEXT NOT NULL UNIQUE
 );
 
 CREATE TABLE dim_user (
-  user_id    BIGSERIAL PRIMARY KEY,
-  ext_user_id TEXT UNIQUE,         -- if you have an external/user-facing ID
-  display_name TEXT
+  user_id      TEXT PRIMARY KEY,          -- you already have string user IDs
+  display_name TEXT,
+  group_id     INTEGER REFERENCES dim_group(group_id) ON UPDATE CASCADE ON DELETE SET NULL
 );
 
-CREATE TABLE dim_instance (
-  instance_id BIGSERIAL PRIMARY KEY,
-  hostname    TEXT UNIQUE NOT NULL,    -- e.g. host-172-16-100-116.nubes.stfc.ac.uk:9100
-  labels      JSONB DEFAULT '{}'       -- optional Prometheus-like labels
+CREATE TABLE dim_project (
+  project_id           INTEGER PRIMARY KEY,
+  cloud_project_name   TEXT NOT NULL UNIQUE
 );
 
 CREATE TABLE dim_machine (
-  machine_id   BIGSERIAL PRIMARY KEY,
-  machine_name TEXT UNIQUE NOT NULL,   -- e.g. 'Artemis (Matlab)'
-  instance_id  BIGINT REFERENCES dim_instance(instance_id) ON DELETE SET NULL,
-  -- any other hardware fields (cpu model, watts_at_idle, etc.)
-  attributes   JSONB DEFAULT '{}'
+  machine_id   INTEGER PRIMARY KEY,
+  machine_name TEXT NOT NULL UNIQUE
 );
 
--- Optional relationship helpers if needed
-CREATE TABLE bridge_project_group (
-  project_id BIGINT REFERENCES dim_project(project_id) ON DELETE CASCADE,
-  group_id   BIGINT REFERENCES dim_group(group_id) ON DELETE CASCADE,
-  PRIMARY KEY (project_id, group_id)
+-- Many-to-many helpers (optional but useful)
+CREATE TABLE map_user_project (
+  user_id    TEXT    NOT NULL REFERENCES dim_user(user_id)    ON DELETE CASCADE,
+  project_id INTEGER NOT NULL REFERENCES dim_project(project_id) ON DELETE CASCADE,
+  PRIMARY KEY (user_id, project_id)
 );
 
-CREATE TABLE bridge_project_user (
-  project_id BIGINT REFERENCES dim_project(project_id) ON DELETE CASCADE,
-  user_id    BIGINT REFERENCES dim_user(user_id) ON DELETE CASCADE,
-  PRIMARY KEY (project_id, user_id)
+CREATE TABLE map_project_machine (
+  project_id INTEGER NOT NULL REFERENCES dim_project(project_id) ON DELETE CASCADE,
+  machine_id INTEGER NOT NULL REFERENCES dim_machine(machine_id) ON DELETE CASCADE,
+  PRIMARY KEY (project_id, machine_id)
 );
 
--- ========== WORKSPACE SESSIONS (from "Active workspaces") ==========
-CREATE TABLE workspace_session (
-  workspace_session_id BIGSERIAL PRIMARY KEY,
-  user_id     BIGINT REFERENCES dim_user(user_id) ON DELETE SET NULL,
-  machine_id  BIGINT REFERENCES dim_machine(machine_id) ON DELETE SET NULL,
-  project_id  BIGINT REFERENCES dim_project(project_id) ON DELETE SET NULL,
-  group_id    BIGINT REFERENCES dim_group(group_id) ON DELETE SET NULL,
-  started_at  TIMESTAMPTZ NOT NULL,
-  ended_at    TIMESTAMPTZ,                 -- NULL => still active
-  -- real-time counters if you want to buffer before rolling into facts
-  busy_kwh    DOUBLE PRECISION DEFAULT 0,
-  idle_kwh    DOUBLE PRECISION DEFAULT 0,
-  busy_gco2eq DOUBLE PRECISION DEFAULT 0,
-  idle_gco2eq DOUBLE PRECISION DEFAULT 0
+-- Optional: break out “instance=host:port” cleanly
+CREATE TABLE dim_instance (
+  instance_id INTEGER PRIMARY KEY,
+  host        TEXT NOT NULL,
+  port        INTEGER,
+  raw_label   TEXT        -- original string if you want to keep it
 );
 
-CREATE INDEX idx_workspace_active ON workspace_session (ended_at) WHERE ended_at IS NULL;
+-- === Fact tables ===
+-- Single flexible timeseries for *all* scopes (Ada, Project, Machine, User)
 
--- ========== FACT TABLES (timeseries) ==========
--- Common metric set: *_cpu_seconds_total, *_kwh, *_gco2eq + intensity
--- Composite PK: (scope_id, timestamp_utc)
+CREATE TABLE fact_usage (
+  usage_id     INTEGER PRIMARY KEY,
+  ts           TEXT    NOT NULL,      -- ISO-8601 UTC (e.g. 2025-09-11T10:30:00Z)
+  scope        TEXT    NOT NULL CHECK (scope IN ('ada','project','machine','user')),
+  project_id   INTEGER REFERENCES dim_project(project_id),
+  machine_id   INTEGER REFERENCES dim_machine(machine_id),
+  user_id      TEXT    REFERENCES dim_user(user_id),
 
--- Ada (global) timeseries
-CREATE TABLE fact_usage_ada (
-  timestamp_utc           TIMESTAMPTZ NOT NULL,
-  busy_cpu_seconds_total  DOUBLE PRECISION NOT NULL,
-  idle_cpu_seconds_total  DOUBLE PRECISION NOT NULL,
-  busy_kwh                DOUBLE PRECISION NOT NULL,
-  idle_kwh                DOUBLE PRECISION NOT NULL,
-  busy_gco2eq             DOUBLE PRECISION NOT NULL,
-  idle_gco2eq             DOUBLE PRECISION NOT NULL,
-  intensity_gco2eq_per_kwh DOUBLE PRECISION,     -- nullable if not known at ingestion
-  PRIMARY KEY (timestamp_utc)
+  busy_cpu_seconds_total REAL NOT NULL DEFAULT 0.0,
+  idle_cpu_seconds_total REAL NOT NULL DEFAULT 0.0,
+  busy_kwh               REAL NOT NULL DEFAULT 0.0,
+  idle_kwh               REAL NOT NULL DEFAULT 0.0,
+  busy_gCo2eq            REAL NOT NULL DEFAULT 0.0,
+  idle_gCo2eq            REAL NOT NULL DEFAULT 0.0,
+  intensity_gCo2eq_kwh   REAL,          -- optional override; can be computed in views
+
+  -- Ensure the right keys are present for each scope
+  CHECK ( (scope='ada'     AND project_id IS NULL AND machine_id IS NULL AND user_id IS NULL)
+       OR (scope='project' AND project_id IS NOT NULL AND machine_id IS NULL AND user_id IS NULL)
+       OR (scope='machine' AND machine_id IS NOT NULL AND project_id IS NULL AND user_id IS NULL)
+       OR (scope='user'    AND user_id    IS NOT NULL AND project_id IS NULL AND machine_id IS NULL)
+  ),
+
+  -- Uniqueness per timeseries grain
+  UNIQUE (scope, ts, COALESCE(project_id, -1), COALESCE(machine_id, -1), COALESCE(user_id, ''))
 );
-CREATE INDEX idx_fact_ada_ts ON fact_usage_ada (timestamp_utc DESC);
 
--- Project timeseries
-CREATE TABLE fact_usage_project (
-  project_id              BIGINT NOT NULL REFERENCES dim_project(project_id) ON DELETE CASCADE,
-  timestamp_utc           TIMESTAMPTZ NOT NULL,
-  busy_cpu_seconds_total  DOUBLE PRECISION NOT NULL,
-  idle_cpu_seconds_total  DOUBLE PRECISION NOT NULL,
-  busy_kwh                DOUBLE PRECISION NOT NULL,
-  idle_kwh                DOUBLE PRECISION NOT NULL,
-  busy_gco2eq             DOUBLE PRECISION NOT NULL,
-  idle_gco2eq             DOUBLE PRECISION NOT NULL,
-  intensity_gco2eq_per_kwh DOUBLE PRECISION,
-  PRIMARY KEY (project_id, timestamp_utc)
+CREATE INDEX idx_fact_usage_ts       ON fact_usage(ts);
+CREATE INDEX idx_fact_usage_scope    ON fact_usage(scope);
+CREATE INDEX idx_fact_usage_project  ON fact_usage(project_id) WHERE project_id IS NOT NULL;
+CREATE INDEX idx_fact_usage_machine  ON fact_usage(machine_id) WHERE machine_id IS NOT NULL;
+CREATE INDEX idx_fact_usage_user     ON fact_usage(user_id)    WHERE user_id IS NOT NULL;
+
+-- Active workspaces (normalized)
+CREATE TABLE active_workspace (
+  workspace_id INTEGER PRIMARY KEY,
+  instance_id  INTEGER NOT NULL REFERENCES dim_instance(instance_id),
+  machine_id   INTEGER NOT NULL REFERENCES dim_machine(machine_id),
+  user_id      TEXT REFERENCES dim_user(user_id),
+  project_id   INTEGER REFERENCES dim_project(project_id),
+  started_at   TEXT  NOT NULL   -- ISO-8601 UTC
+  -- Note: per-workspace energy/carbon shouldn’t live here; they belong in fact_usage
 );
-CREATE INDEX idx_fact_project_ts ON fact_usage_project (timestamp_utc DESC);
 
--- Machine timeseries
-CREATE TABLE fact_usage_machine (
-  machine_id              BIGINT NOT NULL REFERENCES dim_machine(machine_id) ON DELETE CASCADE,
-  timestamp_utc           TIMESTAMPTZ NOT NULL,
-  busy_cpu_seconds_total  DOUBLE PRECISION NOT NULL,
-  idle_cpu_seconds_total  DOUBLE PRECISION NOT NULL,
-  busy_kwh                DOUBLE PRECISION NOT NULL,
-  idle_kwh                DOUBLE PRECISION NOT NULL,
-  busy_gco2eq             DOUBLE PRECISION NOT NULL,
-  idle_gco2eq             DOUBLE PRECISION NOT NULL,
-  intensity_gco2eq_per_kwh DOUBLE PRECISION,
-  PRIMARY KEY (machine_id, timestamp_utc)
-);
-CREATE INDEX idx_fact_machine_ts ON fact_usage_machine (timestamp_utc DESC);
-
--- User timeseries
-CREATE TABLE fact_usage_user (
-  user_id                 BIGINT NOT NULL REFERENCES dim_user(user_id) ON DELETE CASCADE,
-  timestamp_utc           TIMESTAMPTZ NOT NULL,
-  busy_cpu_seconds_total  DOUBLE PRECISION NOT NULL,
-  idle_cpu_seconds_total  DOUBLE PRECISION NOT NULL,
-  busy_kwh                DOUBLE PRECISION NOT NULL,
-  idle_kwh                DOUBLE PRECISION NOT NULL,
-  busy_gco2eq             DOUBLE PRECISION NOT NULL,
-  idle_gco2eq             DOUBLE PRECISION NOT NULL,
-  intensity_gco2eq_per_kwh DOUBLE PRECISION,
-  PRIMARY KEY (user_id, timestamp_utc)
-);
-CREATE INDEX idx_fact_user_ts ON fact_usage_user (timestamp_utc DESC);
-
--- Group timeseries
-CREATE TABLE fact_usage_group (
-  group_id                BIGINT NOT NULL REFERENCES dim_group(group_id) ON DELETE CASCADE,
-  timestamp_utc           TIMESTAMPTZ NOT NULL,
-  busy_cpu_seconds_total  DOUBLE PRECISION NOT NULL,
-  idle_cpu_seconds_total  DOUBLE PRECISION NOT NULL,
-  busy_kwh                DOUBLE PRECISION NOT NULL,
-  idle_kwh                DOUBLE PRECISION NOT NULL,
-  busy_gco2eq             DOUBLE PRECISION NOT NULL,
-  idle_gco2eq             DOUBLE PRECISION NOT NULL,
-  intensity_gco2eq_per_kwh DOUBLE PRECISION,
-  PRIMARY KEY (group_id, timestamp_utc)
-);
-CREATE INDEX idx_fact_group_ts ON fact_usage_group (timestamp_utc DESC);
-
--- ========== TOTALS & AVERAGES AS VIEWS ==========
--- You can parameterize by a time window in queries; these views show "lifetime".
-
--- Project Total (matches your “Project Total”)
-CREATE VIEW v_project_total AS
+-- === Derived “Totals” and “Averages” as VIEWS ===
+-- Ada total timeseries (unchanged semantics, now just a slice)
+CREATE VIEW v_ada_timeseries AS
 SELECT
-  p.project_id,
+  ts,
+  busy_cpu_seconds_total,
+  idle_cpu_seconds_total,
+  busy_kwh,
+  idle_kwh,
+  busy_gCo2eq,
+  idle_gCo2eq,
+  CASE
+    WHEN (busy_kwh + idle_kwh) > 0
+    THEN (busy_gCo2eq + idle_gCo2eq) / (busy_kwh + idle_kwh)
+    ELSE NULL
+  END AS intensity_gCo2eq_kwh
+FROM fact_usage
+WHERE scope='ada';
+
+-- Cloud project usage timeseries
+CREATE VIEW v_project_timeseries AS
+SELECT
   p.cloud_project_name,
-  SUM(f.busy_cpu_seconds_total) AS busy_cpu_seconds_total,
-  SUM(f.idle_cpu_seconds_total) AS idle_cpu_seconds_total,
-  SUM(f.busy_kwh)               AS busy_kwh,
-  SUM(f.idle_kwh)               AS idle_kwh,
-  SUM(f.busy_gco2eq)            AS busy_gco2eq,
-  SUM(f.idle_gco2eq)            AS idle_gco2eq
-FROM dim_project p
-JOIN fact_usage_project f USING (project_id)
-GROUP BY p.project_id, p.cloud_project_name;
+  f.ts,
+  f.busy_cpu_seconds_total,
+  f.idle_cpu_seconds_total,
+  f.busy_kwh,
+  f.idle_kwh,
+  f.busy_gCo2eq,
+  f.idle_gCo2eq,
+  COALESCE(f.intensity_gCo2eq_kwh,
+           CASE WHEN (f.busy_kwh + f.idle_kwh) > 0
+                THEN (f.busy_gCo2eq + f.idle_gCo2eq)/(f.busy_kwh + f.idle_kwh)
+           END) AS intensity_gCo2eq_kwh
+FROM fact_usage f
+JOIN dim_project p ON p.project_id = f.project_id
+WHERE f.scope='project';
 
--- Machine Total
-CREATE VIEW v_machine_total AS
+-- Machine usage timeseries
+CREATE VIEW v_machine_timeseries AS
 SELECT
-  m.machine_id,
   m.machine_name,
-  SUM(f.busy_cpu_seconds_total) AS busy_cpu_seconds_total,
-  SUM(f.idle_cpu_seconds_total) AS idle_cpu_seconds_total,
-  SUM(f.busy_kwh)               AS busy_kwh,
-  SUM(f.idle_kwh)               AS idle_kwh,
-  SUM(f.busy_gco2eq)            AS busy_gco2eq,
-  SUM(f.idle_gco2eq)            AS idle_gco2eq
-FROM dim_machine m
-JOIN fact_usage_machine f USING (machine_id)
-GROUP BY m.machine_id, m.machine_name;
+  f.ts,
+  f.busy_cpu_seconds_total,
+  f.idle_cpu_seconds_total,
+  f.busy_kwh,
+  f.idle_kwh,
+  f.busy_gCo2eq,
+  f.idle_gCo2eq,
+  COALESCE(f.intensity_gCo2eq_kwh,
+           CASE WHEN (f.busy_kwh + f.idle_kwh) > 0
+                THEN (f.busy_gCo2eq + f.idle_gCo2eq)/(f.busy_kwh + f.idle_kwh)
+           END) AS intensity_gCo2eq_kwh
+FROM fact_usage f
+JOIN dim_machine m ON m.machine_id = f.machine_id
+WHERE f.scope='machine';
 
--- Group Total
-CREATE VIEW v_group_total AS
+-- User usage timeseries
+CREATE VIEW v_user_timeseries AS
 SELECT
-  g.group_id,
+  u.user_id,
+  f.ts,
+  f.busy_cpu_seconds_total,
+  f.idle_cpu_seconds_total,
+  f.busy_kwh,
+  f.idle_kwh,
+  f.busy_gCo2eq,
+  f.idle_gCo2eq,
+  COALESCE(f.intensity_gCo2eq_kwh,
+           CASE WHEN (f.busy_kwh + f.idle_kwh) > 0
+                THEN (f.busy_gCo2eq + f.idle_gCo2eq)/(f.busy_kwh + f.idle_kwh)
+           END) AS intensity_gCo2eq_kwh
+FROM fact_usage f
+JOIN dim_user u ON u.user_id = f.user_id
+WHERE f.scope='user';
+
+-- Project / Machine / Group / User Totals (sums)
+CREATE VIEW v_project_totals AS
+SELECT
+  p.cloud_project_name,
+  SUM(busy_cpu_seconds_total) AS busy_cpu_seconds_total,
+  SUM(idle_cpu_seconds_total) AS idle_cpu_seconds_total,
+  SUM(busy_kwh)              AS busy_kwh,
+  SUM(idle_kwh)              AS idle_kwh,
+  SUM(busy_gCo2eq)           AS busy_gCo2eq,
+  SUM(idle_gCo2eq)           AS idle_gCo2eq
+FROM fact_usage f
+JOIN dim_project p ON p.project_id = f.project_id
+WHERE f.scope='project'
+GROUP BY p.cloud_project_name;
+
+CREATE VIEW v_machine_totals AS
+SELECT
+  m.machine_name,
+  SUM(busy_cpu_seconds_total) AS busy_cpu_seconds_total,
+  SUM(idle_cpu_seconds_total) AS idle_cpu_seconds_total,
+  SUM(busy_kwh)              AS busy_kwh,
+  SUM(idle_kwh)              AS idle_kwh,
+  SUM(busy_gCo2eq)           AS busy_gCo2eq,
+  SUM(idle_gCo2eq)           AS idle_gCo2eq
+FROM fact_usage f
+JOIN dim_machine m ON m.machine_id = f.machine_id
+WHERE f.scope='machine'
+GROUP BY m.machine_name;
+
+CREATE VIEW v_group_totals AS
+SELECT
   g.group_name,
   SUM(f.busy_cpu_seconds_total) AS busy_cpu_seconds_total,
   SUM(f.idle_cpu_seconds_total) AS idle_cpu_seconds_total,
   SUM(f.busy_kwh)               AS busy_kwh,
   SUM(f.idle_kwh)               AS idle_kwh,
-  SUM(f.busy_gco2eq)            AS busy_gco2eq,
-  SUM(f.idle_gco2eq)            AS idle_gco2eq
-FROM dim_group g
-JOIN fact_usage_group f USING (group_id)
-GROUP BY g.group_id, g.group_name;
+  SUM(f.busy_gCo2eq)            AS busy_gCo2eq,
+  SUM(f.idle_gCo2eq)            AS idle_gCo2eq
+FROM fact_usage f
+JOIN dim_user u ON u.user_id = f.user_id
+JOIN dim_group g ON g.group_id = u.group_id
+WHERE f.scope='user'
+GROUP BY g.group_name;
 
--- User Total
-CREATE VIEW v_user_total AS
+CREATE VIEW v_user_totals AS
 SELECT
   u.user_id,
-  COALESCE(u.display_name, u.ext_user_id) AS user_name,
-  SUM(f.busy_cpu_seconds_total) AS busy_cpu_seconds_total,
-  SUM(f.idle_cpu_seconds_total) AS idle_cpu_seconds_total,
-  SUM(f.busy_kwh)               AS busy_kwh,
-  SUM(f.idle_kwh)               AS idle_kwh,
-  SUM(f.busy_gco2eq)            AS busy_gco2eq,
-  SUM(f.idle_gco2eq)            AS idle_gco2eq
-FROM dim_user u
-JOIN fact_usage_user f USING (user_id)
-GROUP BY u.user_id, COALESCE(u.display_name, u.ext_user_id);
+  SUM(busy_cpu_seconds_total) AS busy_cpu_seconds_total,
+  SUM(idle_cpu_seconds_total) AS idle_cpu_seconds_total,
+  SUM(busy_kwh)               AS busy_kwh,
+  SUM(idle_kwh)               AS idle_kwh,
+  SUM(busy_gCo2eq)            AS busy_gCo2eq,
+  SUM(idle_gCo2eq)            AS idle_gCo2eq
+FROM fact_usage f
+JOIN dim_user u ON u.user_id = f.user_id
+WHERE f.scope='user'
+GROUP BY u.user_id;
 
--- “Averages” (mirrors your JSON structure). Example: Project Averages (lifetime).
--- Swap AVG(...) for time-windowed averages in queries as needed.
+-- “Averages” (flattening the JSON blocks)
+-- Here “average” is the arithmetic mean across rows in the chosen timeseries.
+-- If you want a time-weighted mean, switch AVG(...) to SUM(...)/SUM(duration).
+
 CREATE VIEW v_project_averages AS
 SELECT
-  p.project_id,
   p.cloud_project_name,
-  AVG(f.busy_kwh)               AS energy_kwh_busy_avg,
-  AVG(f.idle_kwh)               AS energy_kwh_idle_avg,
-  AVG(f.busy_gco2eq)            AS carbon_gco2eq_busy_avg,
-  AVG(f.idle_gco2eq)            AS carbon_gco2eq_idle_avg,
-  AVG(f.intensity_gco2eq_per_kwh) AS intensity_gco2eq_per_kwh_avg
-FROM dim_project p
-JOIN fact_usage_project f USING (project_id)
-GROUP BY p.project_id, p.cloud_project_name;
+  AVG(busy_kwh)  AS avg_busy_energy_kwh,
+  AVG(idle_kwh)  AS avg_idle_energy_kwh,
+  AVG(busy_gCo2eq) AS avg_busy_carbon_gCo2eq,
+  AVG(idle_gCo2eq) AS avg_idle_carbon_gCo2eq,
+  AVG(
+    CASE WHEN (busy_kwh + idle_kwh) > 0
+         THEN (busy_gCo2eq + idle_gCo2eq)/(busy_kwh + idle_kwh)
+    END
+  ) AS avg_intensity_gCo2eq_kwh
+FROM fact_usage f
+JOIN dim_project p ON p.project_id = f.project_id
+WHERE f.scope='project'
+GROUP BY p.cloud_project_name;
 
 CREATE VIEW v_machine_averages AS
 SELECT
-  m.machine_id,
   m.machine_name,
-  AVG(f.busy_kwh)               AS energy_kwh_busy_avg,
-  AVG(f.idle_kwh)               AS energy_kwh_idle_avg,
-  AVG(f.busy_gco2eq)            AS carbon_gco2eq_busy_avg,
-  AVG(f.idle_gco2eq)            AS carbon_gco2eq_idle_avg,
-  AVG(f.intensity_gco2eq_per_kwh) AS intensity_gco2eq_per_kwh_avg
-FROM dim_machine m
-JOIN fact_usage_machine f USING (machine_id)
-GROUP BY m.machine_id, m.machine_name;
+  AVG(busy_kwh)    AS avg_busy_energy_kwh,
+  AVG(idle_kwh)    AS avg_idle_energy_kwh,
+  AVG(busy_gCo2eq) AS avg_busy_carbon_gCo2eq,
+  AVG(idle_gCo2eq) AS avg_idle_carbon_gCo2eq,
+  AVG(
+    CASE WHEN (busy_kwh + idle_kwh) > 0
+         THEN (busy_gCo2eq + idle_gCo2eq)/(busy_kwh + idle_kwh)
+    END
+  ) AS avg_intensity_gCo2eq_kwh
+FROM fact_usage f
+JOIN dim_machine m ON m.machine_id = f.machine_id
+WHERE f.scope='machine'
+GROUP BY m.machine_name;
 
 CREATE VIEW v_group_averages AS
 SELECT
-  g.group_id,
   g.group_name,
-  AVG(f.busy_kwh)               AS energy_kwh_busy_avg,
-  AVG(f.idle_kwh)               AS energy_kwh_idle_avg,
-  AVG(f.busy_gco2eq)            AS carbon_gco2eq_busy_avg,
-  AVG(f.idle_gco2eq)            AS carbon_gco2eq_idle_avg,
-  AVG(f.intensity_gco2eq_per_kwh) AS intensity_gco2eq_per_kwh_avg
-FROM dim_group g
-JOIN fact_usage_group f USING (group_id)
-GROUP BY g.group_id, g.group_name;
+  AVG(f.busy_kwh)    AS avg_busy_energy_kwh,
+  AVG(f.idle_kwh)    AS avg_idle_energy_kwh,
+  AVG(f.busy_gCo2eq) AS avg_busy_carbon_gCo2eq,
+  AVG(f.idle_gCo2eq) AS avg_idle_carbon_gCo2eq,
+  AVG(
+    CASE WHEN (f.busy_kwh + f.idle_kwh) > 0
+         THEN (f.busy_gCo2eq + f.idle_gCo2eq)/(f.busy_kwh + f.idle_kwh)
+    END
+  ) AS avg_intensity_gCo2eq_kwh
+FROM fact_usage f
+JOIN dim_user u ON u.user_id = f.user_id
+JOIN dim_group g ON g.group_id = u.group_id
+WHERE f.scope='user'
+GROUP BY g.group_name;
 
 CREATE VIEW v_user_averages AS
 SELECT
   u.user_id,
-  COALESCE(u.display_name, u.ext_user_id) AS user_name,
-  AVG(f.busy_kwh)               AS energy_kwh_busy_avg,
-  AVG(f.idle_kwh)               AS energy_kwh_idle_avg,
-  AVG(f.busy_gco2eq)            AS carbon_gco2eq_busy_avg,
-  AVG(f.idle_gco2eq)            AS carbon_gco2eq_idle_avg,
-  AVG(f.intensity_gco2eq_per_kwh) AS intensity_gco2eq_per_kwh_avg
-FROM dim_user u
-JOIN fact_usage_user f USING (user_id)
-GROUP BY u.user_id, COALESCE(u.display_name, u.ext_user_id);
+  AVG(busy_kwh)    AS avg_busy_energy_kwh,
+  AVG(idle_kwh)    AS avg_idle_energy_kwh,
+  AVG(busy_gCo2eq) AS avg_busy_carbon_gCo2eq,
+  AVG(idle_gCo2eq) AS avg_idle_carbon_gCo2eq,
+  AVG(
+    CASE WHEN (busy_kwh + idle_kwh) > 0
+         THEN (busy_gCo2eq + idle_gCo2eq)/(busy_kwh + idle_kwh)
+    END
+  ) AS avg_intensity_gCo2eq_kwh
+FROM fact_usage f
+JOIN dim_user u ON u.user_id = f.user_id
+WHERE f.scope='user'
+GROUP BY u.user_id;
 
 '''
 ## Entity Relationship Diagram
-''' mermaid
+'''mermaid
 erDiagram
-  dim_project {
-    BIGSERIAL project_id PK
-    TEXT cloud_project_name
-  }
+  dim_group ||--o{ dim_user : "has many users"
+  dim_user  ||--o{ fact_usage : "user scope rows"
+  dim_project ||--o{ fact_usage : "project scope rows"
+  dim_machine ||--o{ fact_usage : "machine scope rows"
+
+  dim_user ||--o{ map_user_project : ""
+  dim_project ||--o{ map_user_project : ""
+
+  dim_project ||--o{ map_project_machine : ""
+  dim_machine ||--o{ map_project_machine : ""
+
+  dim_instance ||--o{ active_workspace : "hosts"
+  dim_machine  ||--o{ active_workspace : "runs on"
+  dim_user     ||--o{ active_workspace : "used by"
+  dim_project  ||--o{ active_workspace : "charges to"
 
   dim_group {
-    BIGSERIAL group_id PK
-    TEXT group_name
+    INTEGER group_id PK
+    TEXT    group_name UNIQUE
   }
 
   dim_user {
-    BIGSERIAL user_id PK
-    TEXT ext_user_id
-    TEXT display_name
+    TEXT    user_id PK
+    TEXT    display_name
+    INTEGER group_id FK
   }
 
-  dim_instance {
-    BIGSERIAL instance_id PK
-    TEXT hostname
-    JSONB labels
+  dim_project {
+    INTEGER project_id PK
+    TEXT    cloud_project_name UNIQUE
   }
 
   dim_machine {
-    BIGSERIAL machine_id PK
-    TEXT machine_name
-    BIGINT instance_id FK
-    JSONB attributes
+    INTEGER machine_id PK
+    TEXT    machine_name UNIQUE
   }
 
-  bridge_project_group {
-    BIGINT project_id FK
-    BIGINT group_id FK
+  dim_instance {
+    INTEGER instance_id PK
+    TEXT    host
+    INTEGER port
+    TEXT    raw_label
   }
 
-  bridge_project_user {
-    BIGINT project_id FK
-    BIGINT user_id FK
+  map_user_project {
+    TEXT    user_id FK
+    INTEGER project_id FK
+    PK      "user_id, project_id"
   }
 
-  workspace_session {
-    BIGSERIAL workspace_session_id PK
-    BIGINT user_id FK
-    BIGINT machine_id FK
-    BIGINT project_id FK
-    BIGINT group_id FK
-    TIMESTAMPTZ started_at
-    TIMESTAMPTZ ended_at
-    DOUBLE busy_kwh
-    DOUBLE idle_kwh
-    DOUBLE busy_gco2eq
-    DOUBLE idle_gco2eq
+  map_project_machine {
+    INTEGER project_id FK
+    INTEGER machine_id FK
+    PK      "project_id, machine_id"
   }
 
-  fact_usage_ada {
-    TIMESTAMPTZ timestamp_utc PK
-    DOUBLE busy_cpu_seconds_total
-    DOUBLE idle_cpu_seconds_total
-    DOUBLE busy_kwh
-    DOUBLE idle_kwh
-    DOUBLE busy_gco2eq
-    DOUBLE idle_gco2eq
-    DOUBLE intensity_gco2eq_per_kwh
+  fact_usage {
+    INTEGER usage_id PK
+    TEXT    ts
+    TEXT    scope  "ada|project|machine|user"
+    INTEGER project_id FK
+    INTEGER machine_id FK
+    TEXT    user_id FK
+    REAL    busy_cpu_seconds_total
+    REAL    idle_cpu_seconds_total
+    REAL    busy_kwh
+    REAL    idle_kwh
+    REAL    busy_gCo2eq
+    REAL    idle_gCo2eq
+    REAL    intensity_gCo2eq_kwh
+    UNIQUE  "scope, ts, project_id?, machine_id?, user_id?"
   }
 
-  fact_usage_project {
-    BIGINT project_id PK, FK
-    TIMESTAMPTZ timestamp_utc PK
-    DOUBLE busy_cpu_seconds_total
-    DOUBLE idle_cpu_seconds_total
-    DOUBLE busy_kwh
-    DOUBLE idle_kwh
-    DOUBLE busy_gco2eq
-    DOUBLE idle_gco2eq
-    DOUBLE intensity_gco2eq_per_kwh
+  active_workspace {
+    INTEGER workspace_id PK
+    INTEGER instance_id  FK
+    INTEGER machine_id   FK
+    TEXT    user_id      FK
+    INTEGER project_id   FK
+    TEXT    started_at
   }
 
-  fact_usage_machine {
-    BIGINT machine_id PK, FK
-    TIMESTAMPTZ timestamp_utc PK
-    DOUBLE busy_cpu_seconds_total
-    DOUBLE idle_cpu_seconds_total
-    DOUBLE busy_kwh
-    DOUBLE idle_kwh
-    DOUBLE busy_gco2eq
-    DOUBLE idle_gco2eq
-    DOUBLE intensity_gco2eq_per_kwh
-  }
-
-  fact_usage_user {
-    BIGINT user_id PK, FK
-    TIMESTAMPTZ timestamp_utc PK
-    DOUBLE busy_cpu_seconds_total
-    DOUBLE idle_cpu_seconds_total
-    DOUBLE busy_kwh
-    DOUBLE idle_kwh
-    DOUBLE busy_gco2eq
-    DOUBLE idle_gco2eq
-    DOUBLE intensity_gco2eq_per_kwh
-  }
-
-  fact_usage_group {
-    BIGINT group_id PK, FK
-    TIMESTAMPTZ timestamp_utc PK
-    DOUBLE busy_cpu_seconds_total
-    DOUBLE idle_cpu_seconds_total
-    DOUBLE busy_kwh
-    DOUBLE idle_kwh
-    DOUBLE busy_gco2eq
-    DOUBLE idle_gco2eq
-    DOUBLE intensity_gco2eq_per_kwh
-  }
-
-  %% Relationships
-  dim_instance ||--o{ dim_machine : "hosts"
-  dim_machine  ||--o{ workspace_session : "used by"
-  dim_user     ||--o{ workspace_session : "starts"
-  dim_project  ||--o{ workspace_session : "context"
-  dim_group    ||--o{ workspace_session : "context"
-
-  dim_project  ||--o{ fact_usage_project : "has"
-  dim_machine  ||--o{ fact_usage_machine : "has"
-  dim_user     ||--o{ fact_usage_user    : "has"
-  dim_group    ||--o{ fact_usage_group   : "has"
-
-  dim_project  ||--o{ bridge_project_group : "linked to"
-  dim_group    ||--o{ bridge_project_group : "linked from"
-
-  dim_project  ||--o{ bridge_project_user : "linked to"
-  dim_user     ||--o{ bridge_project_user : "linked from"
 '''
+
 
 # Database Classes
 ## Prometheus Request Class
