@@ -34,31 +34,3 @@ permalink: /
 ## [Carbon Equivalents]({{ site.baseurl }}{% link pages/3_frontend.md %}#carbon-equivalents)
 
 
-<h1>{{ page.title }}</h1>
-
-<ul class="toc-root">
-  {%- assign toc_pages = site.pages
-      | where_exp: "p", "p.path contains 'pages/'"
-      | sort: "nav_order" -%}
-
-  {%- for p in toc_pages -%}
-    {%- if p.title and p.url != page.url -%}
-      <li>
-        <a href="{{ p.url | relative_url }}">{{ p.title }}</a>
-
-        {%- comment -%}
-        Build the page-relative subheadings list, then prefix each anchor
-        with the page URL so links become /pages/2_backend/#section, etc.
-        {%- endcomment -%}
-        {%- capture subheads -%}{{ p.content | markdownify | toc_only }}{%- endcapture -%}
-        {%- capture href_prefix -%}href="{{ p.url | relative_url }}#{%- endcapture -%}
-
-        {%- if subheads contains '<li>' -%}
-          <ul class="subheadings">
-            {{ subheads | replace: 'href="#', href_prefix }}
-          </ul>
-        {%- endif -%}
-      </li>
-    {%- endif -%}
-  {%- endfor -%}
-</ul>
