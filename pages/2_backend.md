@@ -309,25 +309,10 @@ GROUP BY u.user_id;
 ## Entity Relationship Diagram
 ```mermaid
 erDiagram
-  dim_group ||--o{ dim_user : "has many users"
-  dim_user  ||--o{ fact_usage : "user scope rows"
-  dim_project ||--o{ fact_usage : "project scope rows"
-  dim_machine ||--o{ fact_usage : "machine scope rows"
-
-  dim_user ||--o{ map_user_project : ""
-  dim_project ||--o{ map_user_project : ""
-
-  dim_project ||--o{ map_project_machine : ""
-  dim_machine ||--o{ map_project_machine : ""
-
-  dim_instance ||--o{ active_workspace : "hosts"
-  dim_machine  ||--o{ active_workspace : "runs on"
-  dim_user     ||--o{ active_workspace : "used by"
-  dim_project  ||--o{ active_workspace : "charges to"
-
+  %% === Dimension tables ===
   dim_group {
     INTEGER group_id PK
-    TEXT    group_name UNIQUE
+    TEXT    group_name UK
   }
 
   dim_user {
@@ -338,12 +323,12 @@ erDiagram
 
   dim_project {
     INTEGER project_id PK
-    TEXT    cloud_project_name UNIQUE
+    TEXT    cloud_project_name UK
   }
 
   dim_machine {
     INTEGER machine_id PK
-    TEXT    machine_name UNIQUE
+    TEXT    machine_name UK
   }
 
   dim_instance {
@@ -353,46 +338,120 @@ erDiagram
     TEXT    raw_label
   }
 
+  %% === Mapping tables (M:N helpers) ===
   map_user_project {
     TEXT    user_id FK
     INTEGER project_id FK
-    PK      "user_id, project_id"
+    PK      (user_id, project_id)
   }
 
   map_project_machine {
     INTEGER project_id FK
     INTEGER machine_id FK
-    PK      "project_id, machine_id"
+    PK      (project_id, machine_id)
   }
 
+  %% === Fact tables ===
   fact_usage {
     INTEGER usage_id PK
     TEXT    ts
-    TEXT    scope  "ada|project|machine|user"
-    INTEGER project_id FK
-    INTEGER machine_id FK
-    TEXT    user_id FK
-    REAL    busy_cpu_seconds_total
-    REAL    idle_cpu_seconds_total
-    REAL    busy_kwh
-    REAL    idle_kwh
-    REAL    busy_gCo2eq
-    REAL    idle_gCo2eq
-    REAL    intensity_gCo2eq_kwh
-    UNIQUE  "scope, ts, project_id?, machine_id?, user_id?"
+    TEXT    scope  "CHECK in ('ada','project','machine','user')"
+    INTEGER project_id FK "nullable"
+    INTEGER machine_id FK "nullable"
+    TEXT    user_id   FK "nullable"
+
+    REAL busy_cpu_seconds_total
+    REAL idle_cpu_seconds_total
+    REAL busy_kwh
+    REAL idle_kwh
+    REAL busy_gCo2eq
+    REAL idle_gCo2eq
+    REAL intensity_gCo2eq_kwh "optional override"
+
+    UNIQUE (scope, ts, COALESCE(project_id,-1), COALESCE(machine_id,-1), COALESCE(user_id,''))
   }
 
   active_workspace {
     INTEGER workspace_id PK
     INTEGER instance_id  FK
     INTEGER machine_id   FK
-    TEXT    user_id      FK
-    INTEGER project_id   FK
+    TEXT    user_id      FK "nullable"
+    INTEGER project_id   FK "nullable"
     TEXT    started_at
   }
 
+  %% === Relationships ===
+  dim_group   ||--o{ dim_user           : "has users"
+  dim_user    ||--o{ map_user_project   : "maps"
+  dim_project ||--o{ map_user_project   : "maps"
+  dim_project ||--o{ map_project_machine: "maps"
+  dim_machine ||--o{ map_project_machine: "maps"
+
+  dim_project ||--o{ fact_usage         : "project scope rows"
+  dim_machine ||--o{ fact_usage         : "machine scope rows"
+  dim_user    ||--o{ fact_usage         : "user scope rows"
+
+  dim_instance||--o{ active_workspace   : "hosts"
+  dim_machine ||--o{ active_workspace   : "runs on"
+  dim_user    ||--o{ active_workspace   : "opened by"
+  dim_project ||--o{ active_workspace   : "belongs to"
 ```
 
+```mermaid
+classDiagram
+  %% Derived views as lightweight dependencies
+  class fact_usage
+  class dim_project
+  class dim_machine
+  class dim_user
+  class dim_group
+
+  class v_ada_timeseries      <<view>>
+  class v_project_timeseries  <<view>>
+  class v_machine_timeseries  <<view>>
+  class v_user_timeseries     <<view>>
+
+  class v_project_totals      <<view>>
+  class v_machine_totals      <<view>>
+  class v_group_totals        <<view>>
+  class v_user_totals         <<view>>
+
+  class v_project_averages    <<view>>
+  class v_machine_averages    <<view>>
+  class v_group_averages      <<view>>
+  class v_user_averages       <<view>>
+
+  %% Timeseries views
+  v_ada_timeseries     --> fact_usage           : scope='ada'
+  v_project_timeseries --> fact_usage
+  v_project_timeseries --> dim_project
+  v_machine_timeseries --> fact_usage
+  v_machine_timeseries --> dim_machine
+  v_user_timeseries    --> fact_usage
+  v_user_timeseries    --> dim_user
+
+  %% Totals views
+  v_project_totals     --> fact_usage
+  v_project_totals     --> dim_project
+  v_machine_totals     --> fact_usage
+  v_machine_totals     --> dim_machine
+  v_group_totals       --> fact_usage
+  v_group_totals       --> dim_user
+  v_group_totals       --> dim_group
+  v_user_totals        --> fact_usage
+  v_user_totals        --> dim_user
+
+  %% Averages views
+  v_project_averages   --> fact_usage
+  v_project_averages   --> dim_project
+  v_machine_averages   --> fact_usage
+  v_machine_averages   --> dim_machine
+  v_group_averages     --> fact_usage
+  v_group_averages     --> dim_user
+  v_group_averages     --> dim_group
+  v_user_averages      --> fact_usage
+  v_user_averages      --> dim_user
+```
 
 # Database Classes
 ## Prometheus Request Class
