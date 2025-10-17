@@ -12,7 +12,7 @@ permalink: /
 
 # [Backend]({{ site.baseurl }}{% link pages/2_backend.md %})
 ## [Database Structure]({{ site.baseurl }}{% link pages/2_backend.md %}#database-structure)
-## Database Classes
+## [Database Classes]({{ site.baseurl }}{% link pages/2_backend.md %}#database-classes)
 ### [Prometheus Request Class]({{ site.baseurl }}{% link pages/2_backend.md %}#prometheus-request-class)
 ### [MongoDB Request Class]({{ site.baseurl }}{% link pages/2_backend.md %}#mongodb-request-class)
 ### [Carbon Intensity API Request Class]({{ site.baseurl }}{% link pages/2_backend.md %}#carbon-intensity-api-request-class)
