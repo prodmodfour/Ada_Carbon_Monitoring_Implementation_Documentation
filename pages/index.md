@@ -38,10 +38,15 @@ permalink: /
 
 <ul>
   {%- assign sorted_pages = site.pages | sort: "path" -%}
-  {%- for page in sorted_pages -%}
-    {%- if page.title and page.url contains '.html' == false and page.url != '/toc.html' -%}
+  {%- for p in sorted_pages -%}
+    {%- if p.title and p.url contains '.html' == false and p.url != '/toc.html' -%}
       <li>
-        <a href="{{ page.url | relative_url }}">{{ page.title }}</a>
+        <a href="{{ p.url | relative_url }}">{{ p.title }}</a>
+        {%- if p.content -%}
+          <ul class="subheadings">
+            {{ p.content | markdownify | toc_only }}
+          </ul>
+        {%- endif -%}
       </li>
     {%- endif -%}
   {%- endfor -%}
