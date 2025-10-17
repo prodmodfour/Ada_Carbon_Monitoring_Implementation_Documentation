@@ -1,41 +1,40 @@
 {% comment %}
-Prev/Next for Just the Docs pages (Markdown-friendly).
-Find siblings with the same parent (or no parent), sorted by nav_order.
+Prev/Next for Just the Docs.
+Build a single ordered list: root index + everything under /pages/.
+Order by nav_order first, then by title for any without nav_order.
 {% endcomment %}
 
-{% assign current_parent = page.parent | default: "" %}
-
-{% assign candidates = site.pages
+{%- assign docs = site.pages
   | where_exp: "p", "p.nav_exclude != true"
-%}
+  | where_exp: "p", "p.url == '/' or p.path contains 'pages/'"
+-%}
 
-{% assign siblings = candidates
-  | where_exp: "p", "(p.parent | default: '') == current_parent"
-  | sort: "nav_order"
-%}
+{%- assign with_order = docs | where_exp: "p", "p.nav_order" | sort: "nav_order" -%}
+{%- assign without_order = docs | where_exp: "p", "p.nav_order == nil" | sort_natural: "title" -%}
+{%- assign ordered = with_order | concat: without_order -%}
 
-{% assign prev = nil %}
-{% assign next = nil %}
+{%- assign prev = nil -%}
+{%- assign next = nil -%}
 
-{% for p in siblings %}
-  {% if p.url == page.url %}
-    {% if forloop.index0 > 0 %}
-      {% assign prev = siblings[forloop.index0 | minus: 1] %}
-    {% endif %}
-    {% assign last_index = siblings.size | minus: 1 %}
-    {% if forloop.index0 < last_index %}
-      {% assign next = siblings[forloop.index0 | plus: 1] %}
-    {% endif %}
-  {% endif %}
-{% endfor %}
+{%- for p in ordered -%}
+  {%- if p.url == page.url -%}
+    {%- if forloop.index0 > 0 -%}
+      {%- assign prev = ordered[forloop.index0 | minus: 1] -%}
+    {%- endif -%}
+    {%- assign last_index = ordered.size | minus: 1 -%}
+    {%- if forloop.index0 < last_index -%}
+      {%- assign next = ordered[forloop.index0 | plus: 1] -%}
+    {%- endif -%}
+  {%- endif -%}
+{%- endfor -%}
 
-{% if prev or next %}
+{%- if prev or next -%}
 <div class="btn-group" style="margin-top: 2rem;">
-  {% if prev %}
+  {%- if prev -%}
     <a class="btn" href="{{ prev.url | relative_url }}">&larr; {{ prev.title }}</a>
-  {% endif %}
-  {% if next %}
+  {%- endif -%}
+  {%- if next -%}
     <a class="btn btn-primary" href="{{ next.url | relative_url }}">{{ next.title }} &rarr;</a>
-  {% endif %}
+  {%- endif -%}
 </div>
-{% endif %}
+{%- endif -%}
