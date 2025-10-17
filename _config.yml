@@ -24,3 +24,8 @@ baseurl: "/Ada_Carbon_Monitoring_Implementation_Documentation"
 just_the_docs:
   # Enables automatic "Previous"/"Next" page links at the bottom
   show_page_navigation: true
+
+# Included sublevels in Table of Contents
+toc:
+  min_level: 1
+  max_level: 3
