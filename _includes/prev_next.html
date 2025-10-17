@@ -1,0 +1,34 @@
+{% comment %}
+Prev/Next for Just the Docs pages.
+Find siblings with the same parent, sort by nav_order, then link to neighbors.
+{% endcomment %}
+
+{% assign siblings = site.html_pages
+  | where_exp: "p", "p.parent == page.parent"
+  | sort: "nav_order" %}
+
+{% assign prev = nil %}
+{% assign next = nil %}
+
+{% for p in siblings %}
+  {% if p.url == page.url %}
+    {% if forloop.index0 > 0 %}
+      {% assign prev = siblings[forloop.index0 | minus: 1] %}
+    {% endif %}
+    {% assign last_index = siblings.size | minus: 1 %}
+    {% if forloop.index0 < last_index %}
+      {% assign next = siblings[forloop.index0 | plus: 1] %}
+    {% endif %}
+  {% endif %}
+{% endfor %}
+
+{% if prev or next %}
+<div class="btn-group" style="margin-top: 2rem;">
+  {% if prev %}
+    <a class="btn" href="{{ prev.url | relative_url }}">&larr; {{ prev.title }}</a>
+  {% endif %}
+  {% if next %}
+    <a class="btn btn-primary" href="{{ next.url | relative_url }}">{{ next.title }} &rarr;</a>
+  {% endif %}
+</div>
+{% endif %}
