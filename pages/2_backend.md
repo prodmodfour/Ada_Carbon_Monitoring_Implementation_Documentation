@@ -6,7 +6,7 @@ nav_exclude: false
 
 # Database Structure
 ## SQL Tables and Views
-'''sql
+```sql
 -- === Dimension tables ===
 
 CREATE TABLE dim_group (
@@ -304,10 +304,10 @@ FROM fact_usage f
 JOIN dim_user u ON u.user_id = f.user_id
 WHERE f.scope='user'
 GROUP BY u.user_id;
+```
 
-'''
 ## Entity Relationship Diagram
-'''mermaid
+```mermaid
 erDiagram
   dim_group ||--o{ dim_user : "has many users"
   dim_user  ||--o{ fact_usage : "user scope rows"
@@ -391,7 +391,7 @@ erDiagram
     TEXT    started_at
   }
 
-'''
+```
 
 
 # Database Classes
