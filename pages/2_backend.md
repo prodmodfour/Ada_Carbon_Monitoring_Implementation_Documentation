@@ -312,7 +312,7 @@ erDiagram
   %% === Dimension tables ===
   dim_group {
     int    group_id PK
-    string group_name "unique"
+    string group_name
   }
 
   dim_user {
@@ -323,12 +323,12 @@ erDiagram
 
   dim_project {
     int    project_id PK
-    string cloud_project_name "unique"
+    string cloud_project_name
   }
 
   dim_machine {
     int    machine_id PK
-    string machine_name "unique"
+    string machine_name
   }
 
   dim_instance {
@@ -340,44 +340,38 @@ erDiagram
 
   %% === Mapping tables (M:N helpers) ===
   map_user_project {
-    string user_id   PK FK
+    string user_id PK FK
     int    project_id PK FK
-    %% composite PK: (user_id, project_id)
   }
 
   map_project_machine {
-    int project_id  PK FK
-    int machine_id  PK FK
-    %% composite PK: (project_id, machine_id)
+    int    project_id PK FK
+    int    machine_id PK FK
   }
 
   %% === Fact tables ===
   fact_usage {
     int    usage_id PK
     string ts
-    string scope  "values: ada | project | machine | user"
-    int    project_id FK  "nullable"
-    int    machine_id FK  "nullable"
-    string user_id   FK   "nullable"
-
+    string scope
+    int    project_id FK
+    int    machine_id FK
+    string user_id   FK
     float  busy_cpu_seconds_total
     float  idle_cpu_seconds_total
     float  busy_kwh
     float  idle_kwh
     float  busy_gCo2eq
     float  idle_gCo2eq
-    float  intensity_gCo2eq_kwh "optional override"
-
-    %% NOTE: Mermaid ER doesn't support CHECK/UNIQUE expressions.
-    %% Intended uniqueness (documented): UNIQUE(scope, ts, project_id?, machine_id?, user_id?)
+    float  intensity_gCo2eq_kwh
   }
 
   active_workspace {
     int    workspace_id PK
     int    instance_id  FK
     int    machine_id   FK
-    string user_id      FK  "nullable"
-    int    project_id   FK  "nullable"
+    string user_id      FK
+    int    project_id   FK
     string started_at
   }
 
@@ -402,30 +396,28 @@ erDiagram
 ## Dependency Diagram
 ```mermaid
 classDiagram
-  %% Derived views as lightweight dependencies
   class fact_usage
   class dim_project
   class dim_machine
   class dim_user
   class dim_group
 
-  class v_ada_timeseries      <<view>>
-  class v_project_timeseries  <<view>>
-  class v_machine_timeseries  <<view>>
-  class v_user_timeseries     <<view>>
+  class v_ada_timeseries
+  class v_project_timeseries
+  class v_machine_timeseries
+  class v_user_timeseries
 
-  class v_project_totals      <<view>>
-  class v_machine_totals      <<view>>
-  class v_group_totals        <<view>>
-  class v_user_totals         <<view>>
+  class v_project_totals
+  class v_machine_totals
+  class v_group_totals
+  class v_user_totals
 
-  class v_project_averages    <<view>>
-  class v_machine_averages    <<view>>
-  class v_group_averages      <<view>>
-  class v_user_averages       <<view>>
+  class v_project_averages
+  class v_machine_averages
+  class v_group_averages
+  class v_user_averages
 
-  %% Timeseries views
-  v_ada_timeseries     --> fact_usage           : scope='ada'
+  v_ada_timeseries     --> fact_usage
   v_project_timeseries --> fact_usage
   v_project_timeseries --> dim_project
   v_machine_timeseries --> fact_usage
@@ -433,7 +425,6 @@ classDiagram
   v_user_timeseries    --> fact_usage
   v_user_timeseries    --> dim_user
 
-  %% Totals views
   v_project_totals     --> fact_usage
   v_project_totals     --> dim_project
   v_machine_totals     --> fact_usage
@@ -444,7 +435,6 @@ classDiagram
   v_user_totals        --> fact_usage
   v_user_totals        --> dim_user
 
-  %% Averages views
   v_project_averages   --> fact_usage
   v_project_averages   --> dim_project
   v_machine_averages   --> fact_usage
