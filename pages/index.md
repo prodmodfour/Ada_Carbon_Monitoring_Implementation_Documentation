@@ -34,5 +34,15 @@ permalink: /
 ## [Carbon Equivalents]({{ site.baseurl }}{% link pages/3_frontend.md %}#carbon-equivalents)
 
 
-<h2>Table of Contents</h2>
-{{ content | toc_only }}
+<h1>{{ page.title }}</h1>
+
+<ul>
+  {%- assign sorted_pages = site.pages | sort: "path" -%}
+  {%- for page in sorted_pages -%}
+    {%- if page.title and page.url contains '.html' == false and page.url != '/toc.html' -%}
+      <li>
+        <a href="{{ page.url | relative_url }}">{{ page.title }}</a>
+      </li>
+    {%- endif -%}
+  {%- endfor -%}
+</ul>
