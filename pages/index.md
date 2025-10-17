@@ -7,29 +7,8 @@ permalink: /
 ---
 
 # [Green Computing Basics]({{ site.baseurl }}{% link pages/0_green_computing_basics.md %})
-## [ Electricity Usage ]({{ site.baseurl }}{% link pages/0_green_computing_basics.md %}#electricity-usage)
-## [ Carbon Intensity ]({{ site.baseurl }}{% link pages/0_green_computing_basics.md %}#carbon-intensity)
-## [ Carbon Footprint ]({{ site.baseurl }}{% link pages/0_green_computing_basics.md %}#carbon-footprint)
-
 
 # [Software Used]({{ site.baseurl }}{% link pages/1_software_used.md %})
-## [APIs]({{ site.baseurl }}{% link pages/1_software_used.md %}#apis)
-### [Carbon Intensity API]({{ site.baseurl }}{% link pages/1_software_used.md %}#carbon-intensity-api)
-## [Databases]({{ site.baseurl }}{% link pages/1_software_used.md %}#databases)
-### [Prometheus]({{ site.baseurl }}{% link pages/1_software_used.md %}#prometheus)
-### [MongoDB]({{ site.baseurl }}{% link pages/1_software_used.md %}#mongodb)
-### [SQLite]({{ site.baseurl }}{% link pages/1_software_used.md %}#sqlite)
-## [Languages]({{ site.baseurl }}{% link pages/1_software_used.md %}#languages)
-### [Python]({{ site.baseurl }}{% link pages/1_software_used.md %}#python)
-### [JavaScript]({{ site.baseurl }}{% link pages/1_software_used.md %}#javascript)
-## [Frontend]({{ site.baseurl }}{% link pages/1_software_used.md %}#frontend)
-### [Svelte]({{ site.baseurl }}{% link pages/1_software_used.md %}#svelte)
-### [Chart.js]({{ site.baseurl }}{% link pages/1_software_used.md %}#chartjs)
-## [Backend]({{ site.baseurl }}{% link pages/1_software_used.md %}#backend)
-### [Flask]({{ site.baseurl }}{% link pages/1_software_used.md %}#flask)
-## [Documentation]({{ site.baseurl }}{% link pages/1_software_used.md %}#documentation)
-### [Jekyll]({{ site.baseurl }}{% link pages/1_software_used.md %}#jekyll)
-### [Mermaid.js]({{ site.baseurl }}{% link pages/1_software_used.md %}#mermaidjs)
 
 # [Backend]({{ site.baseurl }}{% link pages/2_backend.md %})
 ## [Database Structure]({{ site.baseurl }}{% link pages/2_backend.md %}#database-structure)
