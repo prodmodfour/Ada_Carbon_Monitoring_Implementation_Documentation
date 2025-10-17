@@ -311,92 +311,95 @@ GROUP BY u.user_id;
 erDiagram
   %% === Dimension tables ===
   dim_group {
-    INTEGER group_id PK
-    TEXT    group_name UK
+    int    group_id PK
+    string group_name "unique"
   }
 
   dim_user {
-    TEXT    user_id PK
-    TEXT    display_name
-    INTEGER group_id FK
+    string user_id PK
+    string display_name
+    int    group_id FK
   }
 
   dim_project {
-    INTEGER project_id PK
-    TEXT    cloud_project_name UK
+    int    project_id PK
+    string cloud_project_name "unique"
   }
 
   dim_machine {
-    INTEGER machine_id PK
-    TEXT    machine_name UK
+    int    machine_id PK
+    string machine_name "unique"
   }
 
   dim_instance {
-    INTEGER instance_id PK
-    TEXT    host
-    INTEGER port
-    TEXT    raw_label
+    int    instance_id PK
+    string host
+    int    port
+    string raw_label
   }
 
   %% === Mapping tables (M:N helpers) ===
   map_user_project {
-    TEXT    user_id FK
-    INTEGER project_id FK
-    PK      (user_id, project_id)
+    string user_id   PK FK
+    int    project_id PK FK
+    %% composite PK: (user_id, project_id)
   }
 
   map_project_machine {
-    INTEGER project_id FK
-    INTEGER machine_id FK
-    PK      (project_id, machine_id)
+    int project_id  PK FK
+    int machine_id  PK FK
+    %% composite PK: (project_id, machine_id)
   }
 
   %% === Fact tables ===
   fact_usage {
-    INTEGER usage_id PK
-    TEXT    ts
-    TEXT    scope  "CHECK in ('ada','project','machine','user')"
-    INTEGER project_id FK "nullable"
-    INTEGER machine_id FK "nullable"
-    TEXT    user_id   FK "nullable"
+    int    usage_id PK
+    string ts
+    string scope  "values: ada | project | machine | user"
+    int    project_id FK  "nullable"
+    int    machine_id FK  "nullable"
+    string user_id   FK   "nullable"
 
-    REAL busy_cpu_seconds_total
-    REAL idle_cpu_seconds_total
-    REAL busy_kwh
-    REAL idle_kwh
-    REAL busy_gCo2eq
-    REAL idle_gCo2eq
-    REAL intensity_gCo2eq_kwh "optional override"
+    float  busy_cpu_seconds_total
+    float  idle_cpu_seconds_total
+    float  busy_kwh
+    float  idle_kwh
+    float  busy_gCo2eq
+    float  idle_gCo2eq
+    float  intensity_gCo2eq_kwh "optional override"
 
-    UNIQUE (scope, ts, COALESCE(project_id,-1), COALESCE(machine_id,-1), COALESCE(user_id,''))
+    %% NOTE: Mermaid ER doesn't support CHECK/UNIQUE expressions.
+    %% Intended uniqueness (documented): UNIQUE(scope, ts, project_id?, machine_id?, user_id?)
   }
 
   active_workspace {
-    INTEGER workspace_id PK
-    INTEGER instance_id  FK
-    INTEGER machine_id   FK
-    TEXT    user_id      FK "nullable"
-    INTEGER project_id   FK "nullable"
-    TEXT    started_at
+    int    workspace_id PK
+    int    instance_id  FK
+    int    machine_id   FK
+    string user_id      FK  "nullable"
+    int    project_id   FK  "nullable"
+    string started_at
   }
 
   %% === Relationships ===
-  dim_group   ||--o{ dim_user           : "has users"
-  dim_user    ||--o{ map_user_project   : "maps"
-  dim_project ||--o{ map_user_project   : "maps"
-  dim_project ||--o{ map_project_machine: "maps"
-  dim_machine ||--o{ map_project_machine: "maps"
+  dim_group   ||--o{ dim_user            : has_users
+  dim_user    ||--o{ map_user_project    : maps
+  dim_project ||--o{ map_user_project    : maps
+  dim_project ||--o{ map_project_machine : maps
+  dim_machine ||--o{ map_project_machine : maps
 
-  dim_project ||--o{ fact_usage         : "project scope rows"
-  dim_machine ||--o{ fact_usage         : "machine scope rows"
-  dim_user    ||--o{ fact_usage         : "user scope rows"
+  dim_project ||--o{ fact_usage          : project_scope_rows
+  dim_machine ||--o{ fact_usage          : machine_scope_rows
+  dim_user    ||--o{ fact_usage          : user_scope_rows
 
-  dim_instance||--o{ active_workspace   : "hosts"
-  dim_machine ||--o{ active_workspace   : "runs on"
-  dim_user    ||--o{ active_workspace   : "opened by"
-  dim_project ||--o{ active_workspace   : "belongs to"
+  dim_instance||--o{ active_workspace    : hosts
+  dim_machine ||--o{ active_workspace    : runs_on
+  dim_user    ||--o{ active_workspace    : opened_by
+  dim_project ||--o{ active_workspace    : belongs_to
+
 ```
 
+## Dependency Diagram
 ```mermaid
 classDiagram
   %% Derived views as lightweight dependencies
