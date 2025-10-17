@@ -1,11 +1,18 @@
 {% comment %}
-Prev/Next for Just the Docs pages.
-Find siblings with the same parent, sort by nav_order, then link to neighbors.
+Prev/Next for Just the Docs pages (Markdown-friendly).
+Find siblings with the same parent (or no parent), sorted by nav_order.
 {% endcomment %}
 
-{% assign siblings = site.html_pages
-  | where_exp: "p", "p.parent == page.parent"
-  | sort: "nav_order" %}
+{% assign current_parent = page.parent | default: "" %}
+
+{% assign candidates = site.pages
+  | where_exp: "p", "p.nav_exclude != true"
+%}
+
+{% assign siblings = candidates
+  | where_exp: "p", "(p.parent | default: '') == current_parent"
+  | sort: "nav_order"
+%}
 
 {% assign prev = nil %}
 {% assign next = nil %}
