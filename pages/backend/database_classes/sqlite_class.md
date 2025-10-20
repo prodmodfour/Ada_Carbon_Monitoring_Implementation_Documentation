@@ -7,7 +7,7 @@ nav_order: 4
 # Todo
 * Class diagram
 * Functionality examples
-* Functionality descriptions
+* Couple to given sql tables
 
 
 # SQLite Class

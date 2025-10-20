@@ -4,6 +4,9 @@ parent: Database Structure
 nav_order: 2
 ---
 
+# Todo
+* Fix Mermaid ERD
+
 # Entity Relationship Diagram
 ```mermaid
 erDiagram

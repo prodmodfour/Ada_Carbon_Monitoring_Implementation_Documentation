@@ -4,6 +4,9 @@ parent: Database Structure
 nav_order: 3
 ---
 
+# Todo
+* Make the diagram fit the page better
+
 # Dependency Diagram
 ```mermaid
 classDiagram

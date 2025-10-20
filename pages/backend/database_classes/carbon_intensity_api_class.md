@@ -6,7 +6,6 @@ nav_order: 1
 
 # Todo
 * Class diagram
-* Functionality Descriptions
 * Functionality Examples
 
 # Carbon Intensity API Request Class

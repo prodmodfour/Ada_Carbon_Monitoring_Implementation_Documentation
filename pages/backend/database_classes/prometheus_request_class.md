@@ -6,7 +6,6 @@ nav_order: 2
 
 # Todo
 * Class diagram
-* Functionality Description
 * Functionality Examples
 
 # Prometheus Request Class

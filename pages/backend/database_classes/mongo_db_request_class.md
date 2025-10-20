@@ -8,7 +8,7 @@ nav_order: 3
 * Review Ada's actual MongoDB setup
 * Rewrite this to couple more closely to that setup
 * Class Diagram
-* Functionality Descriptions
+
 * Functionality Examples
 
 # MongoDB Request Class

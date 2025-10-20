@@ -4,6 +4,9 @@ parent: Database Structure
 nav_order: 1
 ---
 
+# Todo
+* Split functions into seperate sections
+
 # SQL Tables and Views
 ```sql
 -- === Dimension tables ===
