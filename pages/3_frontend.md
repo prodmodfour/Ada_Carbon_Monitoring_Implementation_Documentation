@@ -17,4 +17,3 @@ We display the machine sizes for each workspace. This is used to estimate the el
 # Carbon Equivalents
 We display carbon equivalents for various activities to help users understand the impact of their compute usage. For example, we display the equivalent number of miles driven in a car or the number of trees planted.
 
-{% include prev_next.html %}

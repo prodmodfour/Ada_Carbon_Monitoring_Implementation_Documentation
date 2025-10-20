@@ -1314,7 +1314,3 @@ We attribute usage to groups based on the cloud_project_name. We store usage dat
 We attribute usage to users based on the user label in Prometheus. We store usage data for each user in a MongoDB database.
 
 
-
-
-
-{% include prev_next.html %}

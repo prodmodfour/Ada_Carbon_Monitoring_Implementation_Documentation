@@ -73,4 +73,3 @@ We use [Jekyll](https://jekyllrb.com/) to create our documentation website. Jeky
 ## Mermaid.js
 We use [Mermaid.js](https://mermaid-js.github.io/mermaid/#/) to create diagrams for our documentation. Mermaid.js is a simple and powerful tool that allows us to create diagrams using a simple syntax.
 
-{% include prev_next.html %}
