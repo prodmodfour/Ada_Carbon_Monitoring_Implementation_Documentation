@@ -4,20 +4,18 @@ parent: Database Structure
 nav_order: 1
 ---
 
-# Todo
-* Split functions into seperate sections
-
 # SQL Tables and Views
-```sql
--- === Dimension tables ===
 
+## Dimension Tables 
+
+```sql
 CREATE TABLE dim_group (
   group_id     INTEGER PRIMARY KEY,
   group_name   TEXT NOT NULL UNIQUE
 );
 
 CREATE TABLE dim_user (
-  user_id      TEXT PRIMARY KEY,          -- you already have string user IDs
+  user_id      TEXT PRIMARY KEY,          
   display_name TEXT,
   group_id     INTEGER REFERENCES dim_group(group_id) ON UPDATE CASCADE ON DELETE SET NULL
 );
@@ -31,8 +29,10 @@ CREATE TABLE dim_machine (
   machine_id   INTEGER PRIMARY KEY,
   machine_name TEXT NOT NULL UNIQUE
 );
+```
 
--- Many-to-many helpers (optional but useful)
+## Many-to-many helpers
+```sql
 CREATE TABLE map_user_project (
   user_id    TEXT    NOT NULL REFERENCES dim_user(user_id)    ON DELETE CASCADE,
   project_id INTEGER NOT NULL REFERENCES dim_project(project_id) ON DELETE CASCADE,
@@ -44,18 +44,22 @@ CREATE TABLE map_project_machine (
   machine_id INTEGER NOT NULL REFERENCES dim_machine(machine_id) ON DELETE CASCADE,
   PRIMARY KEY (project_id, machine_id)
 );
+```
 
--- Optional: break out “instance=host:port” cleanly
+## Optional: break out “instance=host:port” cleanly
+```sql
 CREATE TABLE dim_instance (
   instance_id INTEGER PRIMARY KEY,
   host        TEXT NOT NULL,
   port        INTEGER,
-  raw_label   TEXT        -- original string if you want to keep it
+  raw_label   TEXT        
 );
+```
 
--- === Fact tables ===
--- Single flexible timeseries for *all* scopes (Ada, Project, Machine, User)
+## Fact Tables 
+* Single flexible timeseries for *all* scopes (Ada, Project, Machine, User)
 
+```sql
 CREATE TABLE fact_usage (
   usage_id     INTEGER PRIMARY KEY,
   ts           TEXT    NOT NULL,      -- ISO-8601 UTC (e.g. 2025-09-11T10:30:00Z)
@@ -88,8 +92,9 @@ CREATE INDEX idx_fact_usage_scope    ON fact_usage(scope);
 CREATE INDEX idx_fact_usage_project  ON fact_usage(project_id) WHERE project_id IS NOT NULL;
 CREATE INDEX idx_fact_usage_machine  ON fact_usage(machine_id) WHERE machine_id IS NOT NULL;
 CREATE INDEX idx_fact_usage_user     ON fact_usage(user_id)    WHERE user_id IS NOT NULL;
-
--- Active workspaces (normalized)
+```
+## Active Workspaces Table
+```sql
 CREATE TABLE active_workspace (
   workspace_id INTEGER PRIMARY KEY,
   instance_id  INTEGER NOT NULL REFERENCES dim_instance(instance_id),
@@ -99,8 +104,10 @@ CREATE TABLE active_workspace (
   started_at   TEXT  NOT NULL   -- ISO-8601 UTC
   -- Note: per-workspace energy/carbon shouldn’t live here; they belong in fact_usage
 );
+```
 
--- === Derived “Totals” and “Averages” as VIEWS ===
+## Derived “Totals” and “Averages” as VIEWS
+```sql
 -- Ada total timeseries (unchanged semantics, now just a slice)
 CREATE VIEW v_ada_timeseries AS
 SELECT
@@ -234,9 +241,7 @@ JOIN dim_user u ON u.user_id = f.user_id
 WHERE f.scope='user'
 GROUP BY u.user_id;
 
--- “Averages” (flattening the JSON blocks)
 -- Here “average” is the arithmetic mean across rows in the chosen timeseries.
--- If you want a time-weighted mean, switch AVG(...) to SUM(...)/SUM(duration).
 
 CREATE VIEW v_project_averages AS
 SELECT
