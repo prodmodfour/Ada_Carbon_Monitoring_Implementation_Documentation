@@ -4,6 +4,9 @@ parent: Usage Estimation
 nav_order: 2
 ---
 
+# Todo
+* Explain process of calculating Carbon Footprint
+
 ## Carbon Intensity
 We get the carbon intensity from the Carbon Intensity API. This gives us the carbon intensity (gCo2eq per kwh) for a given time period.
 ## Carbon Footprint
