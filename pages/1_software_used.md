@@ -33,14 +33,14 @@ We use [Prometheus](https://prometheus.io/) to collect and store metrics from ou
 * **How data gets to Prometheus:** Prometheus **pulls** from each VM’s node_exporter on a scrape interval (Potentially every 15 seconds, unverified).
 
 ### How do we pull data from Prometheus?
-See [Prometheus Request Class]({{ site.baseurl }}{% link pages/2_backend.md %}#prometheus-request-class) for more details.
+See [Prometheus Request Class] for more details.
 
 
 ## MongoDB
 [MongoDB](https://www.mongodb.com/) is a document-oriented NoSQL database that stores data in flexible, JSON-like BSON documents instead of rows and tables. It’s schema-optional, so fields can differ across documents and evolve over time. MongoDB is used to store the qualitative data for each workspace, as opposed to quantiative metrics data which is stored in Prometheus.
 
 The mongoDB database stores the user and group that each workspace belongs to. We match this qualitative data with the prometheus metrics by matching timestamps.
-To see more details, refer to [Group Attribution]({{ site.baseurl }}{% link pages/2_backend.md %}#group-attribution) and [User Attribution]({{ site.baseurl }}{% link pages/2_backend.md %}#user-attribution).
+To see more details, refer to [Group Attribution] and [User Attribution].
 
 ## SQLite
 
@@ -49,9 +49,9 @@ To see more details, refer to [Group Attribution]({{ site.baseurl }}{% link page
 
 We use [SQLite](https://www.sqlite.org/index.html) to store our usage data.
 
-To see the structure of our database, refer to [Database Structure]({{ site.baseurl }}{% link pages/2_backend.md %}#database-structure).
+To see the structure of our database, refer to [Database Structure].
 
-To see how we pull data from SQLite, refer to [SQLite Class]({{ site.baseurl }}{% link pages/2_backend.md %}#sqlite-class).
+To see how we pull data from SQLite, refer to [SQLite Class].
 
 # Programming Languages
 ## Python
