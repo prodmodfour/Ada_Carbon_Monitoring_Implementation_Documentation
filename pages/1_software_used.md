@@ -33,7 +33,7 @@ We use [Prometheus](https://prometheus.io/) to collect and store metrics from ou
 * **How data gets to Prometheus:** Prometheus **pulls** from each VM’s node_exporter on a scrape interval (Potentially every 15 seconds, unverified).
 
 ### How do we pull data from Prometheus?
-See [Prometheus Request Class](../pages/backend/database-classes/prometheus-request-class) for more details.
+See [Prometheus Request Class](../pages/backend/database-classes/prometheus-request-class.html) for more details.
 
 
 ## MongoDB
