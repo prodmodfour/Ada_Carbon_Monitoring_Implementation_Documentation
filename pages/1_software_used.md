@@ -40,7 +40,7 @@ See [Prometheus Request Class](../pages/backend/database_classes/prometheus_requ
 [MongoDB](https://www.mongodb.com/) is a document-oriented NoSQL database that stores data in flexible, JSON-like BSON documents instead of rows and tables. It’s schema-optional, so fields can differ across documents and evolve over time. MongoDB is used to store the qualitative data for each workspace, as opposed to quantiative metrics data which is stored in Prometheus.
 
 The mongoDB database stores the user and group that each workspace belongs to. We match this qualitative data with the prometheus metrics by matching timestamps.
-To see more details, refer to [Group Attribution] and [User Attribution].
+To see more details, refer to [Group Attribution](../pages/backend/usage_estimation_methods/group_attribution.md) and [User Attribution](../pages/backend/usage_estimation_methods/user_attribution.md).
 
 ## SQLite
 
@@ -49,9 +49,9 @@ To see more details, refer to [Group Attribution] and [User Attribution].
 
 We use [SQLite](https://www.sqlite.org/index.html) to store our usage data.
 
-To see the structure of our database, refer to [Database Structure].
+To see the structure of our database, refer to [Database Structure](../pages/backend/database_structure/database_structure.md).
 
-To see how we pull data from SQLite, refer to [SQLite Class].
+To see how we pull data from SQLite, refer to [SQLite Class](../pages/backend/database_classes/sqlite_class.md).
 
 # Programming Languages
 ## Python
