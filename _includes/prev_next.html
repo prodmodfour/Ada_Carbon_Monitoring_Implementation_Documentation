@@ -1,101 +1,109 @@
 {%- comment -%}
-Prev/Next navigation for hierarchical pages.
-
-Rules:
-- Siblings are pages with the same `parent` (string).
-- Top-level pages have no `parent`.
-- Child page:
-    prev = previous sibling OR parent if first
-    next = next sibling OR next top-level if last
-- Top-level page:
-    prev = previous top-level (or previous top-level's last child if you want: optional)
-    next = first child if present, else next top-level
+Prev/Next navigation that works with plain Jekyll Liquid.
+Rules now:
+• Order by nav_order (fallback: title).
+• Ignore pages with nav_exclude: true.
+• If a page has children (has_children: true), “Next” goes to its first child.
+• If on a child:
+   - Prev → previous sibling (or parent if first)
+   - Next → next sibling (or next top-level if last)
+• Otherwise linear top-level prev/next.
 {%- endcomment -%}
 
-{%- assign all = site.pages
-  | where_exp: "p", "p.nav_exclude != true"
-  | sort: "nav_order"
-  | sort: "title"
--%}
+{%- assign all = site.pages | where_exp: "p", "p.nav_exclude != true" -%}
+{%- assign ordered = all | sort: "nav_order" -%}
+{%- assign ordered = ordered | sort: "title" -%} {# stable-ish tiebreak #}
 
 {%- assign here = page -%}
 
-{%- comment %} Helper: find page by title (used for parent lookup) {% endcomment -%}
-{%- assign parent_page = nil -%}
-{%- if here.parent %}
-  {%- for p in all %}
-    {%- if p.title == here.parent %}
-      {%- assign parent_page = p -%}
-      {%- break -%}
-    {%- endif %}
-  {%- endfor %}
-{%- endif %}
+{%- comment %} build children map by comparing parent title {% endcomment -%}
+{%- assign top_level = "" | split: "" -%}
+{%- for p in ordered -%}
+  {%- unless p.parent -%}
+    {%- assign top_level = top_level | push: p -%}
+  {%- endunless -%}
+{%- endfor -%}
 
-{%- comment %} Collections for convenience {% endcomment -%}
-{%- assign top_level = all | where_exp: "p", "p.parent == nil" -%}
-{%- assign children = all | where: "parent", here.title | sort: "nav_order" -%}
-{%- assign has_children = children | size | minus: 0 -%}
-
-{%- comment %} Sibling lists {% endcomment -%}
-{%- if here.parent %}
-  {%- assign siblings = all | where: "parent", here.parent | sort: "nav_order" -%}
-{%- else %}
-  {%- assign siblings = top_level -%}
-{%- endif %}
-
-{%- assign prev = nil -%}
-{%- assign next = nil -%}
-
-{%- comment %} Find current index within siblings {% endcomment -%}
-{%- assign idx = -1 -%}
-{%- for p in siblings %}
-  {%- if p.url == here.url %}
-    {%- assign idx = forloop.index0 -%}
-  {%- endif %}
-{%- endfor %}
-
-{%- if idx != -1 -%}
-  {%- assign prev = siblings | slice: idx | last -%}
-  {%- assign next = siblings | slice: idx | shift | first -%}
+{%- comment %} helpers to get children for a given parent title {% endcomment -%}
+{%- assign children_of_here = "" | split: "" -%}
+{%- if here.title and here.has_children -%}
+  {%- for p in ordered -%}
+    {%- if p.parent == here.title -%}
+      {%- assign children_of_here = children_of_here | push: p -%}
+    {%- endif -%}
+  {%- endfor -%}
 {%- endif -%}
 
-{%- comment %}
-Top-level behavior adjustments:
-- If top-level page has children, let "next" prefer the first child.
-- If child page is last among siblings, let "next" be the next top-level page.
-- If child page is first among siblings, let "prev" be parent.
-{%- endcomment -%}
+{%- assign siblings = "" | split: "" -%}
+{%- if here.parent -%}
+  {%- for p in ordered -%}
+    {%- if p.parent == here.parent -%}
+      {%- assign siblings = siblings | push: p -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- else -%}
+  {%- assign siblings = top_level -%}
+{%- endif -%}
+
+{%- comment %} find prev/next among siblings {% endcomment -%}
+{%- assign prev = nil -%}
+{%- assign next = nil -%}
+{%- assign found = false -%}
+{%- assign last_seen = nil -%}
+{%- for p in siblings -%}
+  {%- if found and next == nil -%}{%- assign next = p -%}{%- break -%}{%- endif -%}
+  {%- if p.url == here.url -%}
+    {%- assign prev = last_seen -%}
+    {%- assign found = true -%}
+  {%- endif -%}
+  {%- assign last_seen = p -%}
+{%- endfor -%}
 
 {%- if here.parent -%}
-  {%- comment %} Child page rules {% endcomment -%}
-  {%- if prev and prev.url == here.url %}{% assign prev = nil %}{% endif -%}
-  {%- if next and next.url == here.url %}{% assign next = nil %}{% endif -%}
+  {# Child page rules #}
+  {%- if prev == nil -%}
+    {%- comment %} first child → prev is parent {% endcomment -%}
+    {%- assign parent_page = nil -%}
+    {%- for p in ordered -%}{%- if p.title == here.parent -%}{%- assign parent_page = p -%}{%- break -%}{%- endif -%}{%- endfor -%}
+    {%- assign prev = parent_page -%}
+  {%- endif -%}
 
-  {%- if idx == 0 and parent_page %}{% assign prev = parent_page %}{% endif -%}
-
-  {%- if idx == siblings.size | minus: 1 -%}
-    {%- comment %} Last child → move to next top-level {% endcomment -%}
-    {%- assign parent_index = -1 -%}
-    {%- for tp in top_level %}
-      {%- if tp.url == parent_page.url %}
-        {%- assign parent_index = forloop.index0 -%}
-      {%- endif %}
-    {%- endfor %}
-    {%- if parent_index != -1 -%}
-      {%- assign next_top = top_level | slice: parent_index | shift | first -%}
-      {%- assign next = next_top -%}
-    {%- endif -%}
+  {%- if next == nil -%}
+    {%- comment %} last child → next is next top-level after the parent {% endcomment -%}
+    {%- assign parent_page = nil -%}
+    {%- for p in ordered -%}{%- if p.title == here.parent -%}{%- assign parent_page = p -%}{%- break -%}{%- endif -%}{%- endfor -%}
+    {%- assign seen_parent = false -%}
+    {%- for tp in top_level -%}
+      {%- if seen_parent -%}{%- assign next = tp -%}{%- break -%}{%- endif -%}
+      {%- if tp.url == parent_page.url -%}{%- assign seen_parent = true -%}{%- endif -%}
+    {%- endfor -%}
   {%- endif -%}
 
 {%- else -%}
-  {%- comment %} Top-level page rules {% endcomment -%}
-  {%- if has_children > 0 -%}
-    {%- assign first_child = children | first -%}
-    {%- assign next = first_child -%}
+  {# Top-level page rules #}
+  {%- if next == nil -%}
+    {%- comment %} last top-level → next remains nil {% endcomment -%}
+  {%- endif -%}
+
+  {%- if next == nil and here.has_children -%}
+    {%- comment %} fallback: if no next sibling but has children, send to first child {% endcomment -%}
+    {%- assign first_child = nil -%}
+    {%- for c in ordered -%}
+      {%- if c.parent == here.title -%}{%- assign first_child = c -%}{%- break -%}{%- endif -%}
+    {%- endfor -%}
+    {%- if first_child -%}{%- assign next = first_child -%}{%- endif -%}
+  {%- else -%}
+    {%- if here.has_children and next -%}
+      {%- comment %} prefer first child over next top-level {% endcomment -%}
+      {%- assign first_child = nil -%}
+      {%- for c in ordered -%}
+        {%- if c.parent == here.title -%}{%- assign first_child = c -%}{%- break -%}{%- endif -%}
+      {%- endfor -%}
+      {%- if first_child -%}{%- assign next = first_child -%}{%- endif -%}
+    {%- endif -%}
   {%- endif -%}
 {%- endif -%}
 
-{%- comment %} Render buttons if available {% endcomment -%}
 <nav class="prev-next" style="display:flex;justify-content:space-between;gap:1rem;margin-top:2rem;">
   <div>
     {%- if prev -%}
