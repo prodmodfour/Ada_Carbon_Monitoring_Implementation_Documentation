@@ -1,0 +1,110 @@
+{%- comment -%}
+Prev/Next navigation for hierarchical pages.
+
+Rules:
+- Siblings are pages with the same `parent` (string).
+- Top-level pages have no `parent`.
+- Child page:
+    prev = previous sibling OR parent if first
+    next = next sibling OR next top-level if last
+- Top-level page:
+    prev = previous top-level (or previous top-level's last child if you want: optional)
+    next = first child if present, else next top-level
+{%- endcomment -%}
+
+{%- assign all = site.pages
+  | where_exp: "p", "p.nav_exclude != true"
+  | sort: "nav_order"
+  | sort: "title"
+-%}
+
+{%- assign here = page -%}
+
+{%- comment %} Helper: find page by title (used for parent lookup) {% endcomment -%}
+{%- assign parent_page = nil -%}
+{%- if here.parent %}
+  {%- for p in all %}
+    {%- if p.title == here.parent %}
+      {%- assign parent_page = p -%}
+      {%- break -%}
+    {%- endif %}
+  {%- endfor %}
+{%- endif %}
+
+{%- comment %} Collections for convenience {% endcomment -%}
+{%- assign top_level = all | where_exp: "p", "p.parent == nil" -%}
+{%- assign children = all | where: "parent", here.title | sort: "nav_order" -%}
+{%- assign has_children = children | size | minus: 0 -%}
+
+{%- comment %} Sibling lists {% endcomment -%}
+{%- if here.parent %}
+  {%- assign siblings = all | where: "parent", here.parent | sort: "nav_order" -%}
+{%- else %}
+  {%- assign siblings = top_level -%}
+{%- endif %}
+
+{%- assign prev = nil -%}
+{%- assign next = nil -%}
+
+{%- comment %} Find current index within siblings {% endcomment -%}
+{%- assign idx = -1 -%}
+{%- for p in siblings %}
+  {%- if p.url == here.url %}
+    {%- assign idx = forloop.index0 -%}
+  {%- endif %}
+{%- endfor %}
+
+{%- if idx != -1 -%}
+  {%- assign prev = siblings | slice: idx | last -%}
+  {%- assign next = siblings | slice: idx | shift | first -%}
+{%- endif -%}
+
+{%- comment %}
+Top-level behavior adjustments:
+- If top-level page has children, let "next" prefer the first child.
+- If child page is last among siblings, let "next" be the next top-level page.
+- If child page is first among siblings, let "prev" be parent.
+{%- endcomment -%}
+
+{%- if here.parent -%}
+  {%- comment %} Child page rules {% endcomment -%}
+  {%- if prev and prev.url == here.url %}{% assign prev = nil %}{% endif -%}
+  {%- if next and next.url == here.url %}{% assign next = nil %}{% endif -%}
+
+  {%- if idx == 0 and parent_page %}{% assign prev = parent_page %}{% endif -%}
+
+  {%- if idx == siblings.size | minus: 1 -%}
+    {%- comment %} Last child → move to next top-level {% endcomment -%}
+    {%- assign parent_index = -1 -%}
+    {%- for tp in top_level %}
+      {%- if tp.url == parent_page.url %}
+        {%- assign parent_index = forloop.index0 -%}
+      {%- endif %}
+    {%- endfor %}
+    {%- if parent_index != -1 -%}
+      {%- assign next_top = top_level | slice: parent_index | shift | first -%}
+      {%- assign next = next_top -%}
+    {%- endif -%}
+  {%- endif -%}
+
+{%- else -%}
+  {%- comment %} Top-level page rules {% endcomment -%}
+  {%- if has_children > 0 -%}
+    {%- assign first_child = children | first -%}
+    {%- assign next = first_child -%}
+  {%- endif -%}
+{%- endif -%}
+
+{%- comment %} Render buttons if available {% endcomment -%}
+<nav class="prev-next" style="display:flex;justify-content:space-between;gap:1rem;margin-top:2rem;">
+  <div>
+    {%- if prev -%}
+      <a class="btn btn-outline" href="{{ prev.url | relative_url }}">&larr; {{ prev.title }}</a>
+    {%- endif -%}
+  </div>
+  <div>
+    {%- if next -%}
+      <a class="btn btn-primary" href="{{ next.url | relative_url }}">{{ next.title }} &rarr;</a>
+    {%- endif -%}
+  </div>
+</nav>

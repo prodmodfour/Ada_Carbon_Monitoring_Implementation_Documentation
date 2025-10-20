@@ -32,3 +32,6 @@ permalink: /
 ## [Workspace Card]({{ site.baseurl }}{% link pages/3_frontend.md %}#workspace-card)
 ## [Machine Sizes]({{ site.baseurl }}{% link pages/3_frontend.md %}#machine-sizes)
 ## [Carbon Equivalents]({{ site.baseurl }}{% link pages/3_frontend.md %}#carbon-equivalents)
+
+
+{% include prev_next.html %}
