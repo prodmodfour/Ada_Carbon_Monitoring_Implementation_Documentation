@@ -16,3 +16,5 @@ We display a card for each workspace that shows the estimated usage for that wor
 We display the machine sizes for each workspace. This is used to estimate the electricity usage and carbon footprint for each workspace.
 # Carbon Equivalents
 We display carbon equivalents for various activities to help users understand the impact of their compute usage. For example, we display the equivalent number of miles driven in a car or the number of trees planted.
+
+{% include prev_next.html %}

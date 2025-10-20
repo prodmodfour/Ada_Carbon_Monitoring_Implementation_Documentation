@@ -26,3 +26,5 @@ Time shifting is the practice of scheduling compute-intensive tasks to run durin
 Overprovisioning is the practice of allocating more resources than are actually needed for a computing task. This can lead to wasted electricity usage and a higher carbon footprint. Reducing overprovisioning can help to lower the carbon footprint of a computing system by ensuring that resources are used efficiently.
 ## Cutting down on idle usage
 Idle usage is the practice of keeping computing resources powered on and ready to use, even when they are not actively being used. This can lead to wasted electricity usage and a higher carbon footprint. Cutting down on idle usage can help to lower the carbon footprint of a computing system by ensuring that resources are only powered on when they are needed.
+
+{% include prev_next.html %}

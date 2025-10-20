@@ -72,3 +72,5 @@ We use [Flask](https://flask.palletsprojects.com/en/2.3.x/) for our backend deve
 We use [Jekyll](https://jekyllrb.com/) to create our documentation website. Jekyll is a static site generator that allows us to create fast and efficient websites using Markdown.
 ## Mermaid.js
 We use [Mermaid.js](https://mermaid-js.github.io/mermaid/#/) to create diagrams for our documentation. Mermaid.js is a simple and powerful tool that allows us to create diagrams using a simple syntax.
+
+{% include prev_next.html %}
