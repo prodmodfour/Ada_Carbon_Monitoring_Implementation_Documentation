@@ -14,7 +14,7 @@ nav_order: 1
 * **Instances** are network endpoints (`host`, `port`) that Machines expose; they’re referenced by **Active Workspaces** to describe an active session.
 * **Usage facts** live in **one flexible time-series** table (`fact_usage`), keyed by `(scope, ts, [project|machine|user])` depending on scope. You slice-and-aggregate to get totals/averages.
 
-```Mermaid
+```mermaid
 flowchart LR
   Group[Group] --> User[User]
   User <--> Project[Project]
