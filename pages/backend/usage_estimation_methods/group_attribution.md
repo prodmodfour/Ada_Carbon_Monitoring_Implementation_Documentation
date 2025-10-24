@@ -4,8 +4,4 @@ parent: Usage Estimation
 nav_order: 5
 ---
 
-# Todo
-* Explain process of attributing usage to groups.
-
-# Group Attribution
-We attribute usage to groups based on the cloud_project_name. We store usage data for each group in a MongoDB database.
+### This section is under reconstruction, as the methodology will change greatly as we switch from the JSON file method in the Mock implementation to a MongoDB method in the actual implementation
