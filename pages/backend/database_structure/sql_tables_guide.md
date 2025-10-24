@@ -1,7 +1,7 @@
 ---
 title: SQL Tables & Views Guide
 parent: Database Structure
-nav_order: 2
+nav_order: 1
 ---
 
 
