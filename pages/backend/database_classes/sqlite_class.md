@@ -7,7 +7,7 @@ nav_order: 4
 # Todo
 * Class diagram
 * Functionality examples
-* Couple to given sql tables
+* Refactor: Make less monolithic
 
 
 # SQLite Class
@@ -22,13 +22,9 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Optional
 
-
-# ---- Small utility: dict rows ------------------------------------------------
 def _dict_factory(cursor: sqlite3.Cursor, row: tuple) -> dict:
     return {col[0]: row[idx] for idx, col in enumerate(cursor.description or [])}
 
-
-# ---- Main DB class -----------------------------------------------------------
 @dataclass
 class UsageDB:
     path: str = ":memory:"
@@ -40,7 +36,7 @@ class UsageDB:
         self._configure()
         self.create_all()
 
-    # -- connection/pragma -----------------------------------------------------
+    # Connection
     def _configure(self) -> None:
         cur = self.conn.cursor()
         cur.execute("PRAGMA foreign_keys = ON;")
@@ -65,9 +61,10 @@ class UsageDB:
             cur.execute("ROLLBACK;")
             raise
 
-    # -- schema ----------------------------------------------------------------
+    # Schema
     def create_all(self) -> None:
         cur = self.conn.cursor()
+
         # Dimension tables
         cur.executescript("""
         CREATE TABLE IF NOT EXISTS dim_group (
@@ -91,8 +88,18 @@ class UsageDB:
           machine_name TEXT NOT NULL UNIQUE
         );
 
+        CREATE TABLE IF NOT EXISTS dim_instance (
+          instance_id INTEGER PRIMARY KEY,
+          host        TEXT NOT NULL,
+          port        INTEGER,
+          raw_label   TEXT
+        );
+        """)
+
+        # Many-to-many helpers
+        cur.executescript("""
         CREATE TABLE IF NOT EXISTS map_user_project (
-          user_id    TEXT    NOT NULL REFERENCES dim_user(user_id)    ON DELETE CASCADE,
+          user_id    TEXT    NOT NULL REFERENCES dim_user(user_id)       ON DELETE CASCADE,
           project_id INTEGER NOT NULL REFERENCES dim_project(project_id) ON DELETE CASCADE,
           PRIMARY KEY (user_id, project_id)
         );
@@ -102,16 +109,9 @@ class UsageDB:
           machine_id INTEGER NOT NULL REFERENCES dim_machine(machine_id) ON DELETE CASCADE,
           PRIMARY KEY (project_id, machine_id)
         );
-
-        CREATE TABLE IF NOT EXISTS dim_instance (
-          instance_id INTEGER PRIMARY KEY,
-          host        TEXT NOT NULL,
-          port        INTEGER,
-          raw_label   TEXT
-        );
         """)
 
-        # Fact tables
+        # Fact table
         cur.executescript("""
         CREATE TABLE IF NOT EXISTS fact_usage (
           usage_id     INTEGER PRIMARY KEY,
@@ -143,7 +143,10 @@ class UsageDB:
         CREATE INDEX IF NOT EXISTS idx_fact_usage_project  ON fact_usage(project_id) WHERE project_id IS NOT NULL;
         CREATE INDEX IF NOT EXISTS idx_fact_usage_machine  ON fact_usage(machine_id) WHERE machine_id IS NOT NULL;
         CREATE INDEX IF NOT EXISTS idx_fact_usage_user     ON fact_usage(user_id)    WHERE user_id IS NOT NULL;
+        """)
 
+        # Active workspaces
+        cur.executescript("""
         CREATE TABLE IF NOT EXISTS active_workspace (
           workspace_id INTEGER PRIMARY KEY,
           instance_id  INTEGER NOT NULL REFERENCES dim_instance(instance_id),
@@ -154,7 +157,7 @@ class UsageDB:
         );
         """)
 
-        # Views
+        # Views: time-series, totals, averages 
         cur.executescript("""
         CREATE VIEW IF NOT EXISTS v_ada_timeseries AS
         SELECT
@@ -354,7 +357,29 @@ class UsageDB:
         GROUP BY u.user_id;
         """)
 
-    # -- get-or-create helpers -------------------------------------------------
+        # Convenience views 
+        cur.executescript("""
+        CREATE VIEW IF NOT EXISTS v_active_workspaces AS
+        SELECT aw.workspace_id, aw.started_at,
+               u.display_name AS user,
+               p.cloud_project_name AS project,
+               m.machine_name AS machine,
+               i.host, i.port
+        FROM active_workspace aw
+        JOIN dim_machine   m ON m.machine_id  = aw.machine_id
+        JOIN dim_instance  i ON i.instance_id = aw.instance_id
+        LEFT JOIN dim_user u ON u.user_id     = aw.user_id
+        LEFT JOIN dim_project p ON p.project_id = aw.project_id;
+
+        CREATE VIEW IF NOT EXISTS v_user_project AS
+        SELECT u.user_id, u.display_name, g.group_name, p.cloud_project_name
+        FROM map_user_project up
+        JOIN dim_user u   ON u.user_id     = up.user_id
+        LEFT JOIN dim_group g ON g.group_id = u.group_id
+        JOIN dim_project p ON p.project_id  = up.project_id;
+        """)
+
+    # 
     def get_or_create_group(self, group_name: str) -> int:
         cur = self.conn.cursor()
         cur.execute("INSERT OR IGNORE INTO dim_group(group_name) VALUES (?)", (group_name,))
@@ -397,7 +422,7 @@ class UsageDB:
         """, (host, port, raw_label))
         return cur.lastrowid
 
-    # -- mapping helpers -------------------------------------------------------
+    # Mapping Helpers
     def map_user_project(self, user_id: str, project_id: int | None = None,
                          cloud_project_name: str | None = None) -> None:
         if project_id is None:
@@ -425,7 +450,7 @@ class UsageDB:
             (project_id, machine_id)
         )
 
-    # -- active workspaces -----------------------------------------------------
+    # Active Workspaces
     def start_workspace(self, instance_id: int, machine_id: int,
                         started_at_iso_utc: str, user_id: Optional[str] = None,
                         project_id: Optional[int] = None) -> int:
@@ -436,7 +461,7 @@ class UsageDB:
         """, (instance_id, machine_id, user_id, project_id, started_at_iso_utc))
         return cur.lastrowid
 
-    # -- fact_usage inserts ----------------------------------------------------
+    # Fact Usage Inserts
     @staticmethod
     def _validate_scope(scope: str,
                         project_id: Optional[int],
@@ -459,8 +484,6 @@ class UsageDB:
             if expected == "req" and provided is None:
                 raise ValueError(f"{name} is required for scope='{scope}'")
             if expected is None and provided is not None and scope != name.split("_")[0]:
-                # ensure *only* the required key is set
-                # (the SQL CHECK also enforces this)
                 raise ValueError(f"{name} must be NULL for scope='{scope}'")
 
     def insert_fact_usage(self, *, scope: str, ts_iso_utc: str,
@@ -503,11 +526,11 @@ class UsageDB:
             for r in rows:
                 self.insert_fact_usage(**r)
 
-    # -- query helpers (views) -------------------------------------------------
+    # Generic Query Helper
     def q(self, sql: str, params: tuple | dict = ()) -> list[dict]:
         return list(self.conn.execute(sql, params))
 
-    # Timeseries
+    # View Backed Helpers (Time series)
     def ada_timeseries(self) -> list[dict]:
         return self.q("SELECT * FROM v_ada_timeseries ORDER BY ts")
 
@@ -529,7 +552,7 @@ class UsageDB:
             WHERE user_id=? ORDER BY ts
         """, (user_id,))
 
-    # Totals
+    # Totals and Averages
     def project_totals(self) -> list[dict]:
         return self.q("SELECT * FROM v_project_totals ORDER BY cloud_project_name")
 
@@ -542,7 +565,6 @@ class UsageDB:
     def user_totals(self) -> list[dict]:
         return self.q("SELECT * FROM v_user_totals ORDER BY user_id")
 
-    # Averages
     def project_averages(self) -> list[dict]:
         return self.q("SELECT * FROM v_project_averages ORDER BY cloud_project_name")
 
@@ -554,4 +576,90 @@ class UsageDB:
 
     def user_averages(self) -> list[dict]:
         return self.q("SELECT * FROM v_user_averages ORDER BY user_id")
+
+    # Convenience Views
+    def active_workspaces(self) -> list[dict]:
+        return self.q("SELECT * FROM v_active_workspaces ORDER BY started_at DESC")
+
+    def user_project_memberships(self) -> list[dict]:
+        return self.q("SELECT * FROM v_user_project ORDER BY cloud_project_name, user_id")
+
+    # Cookbook Helpers
+    def project_energy_carbon_between(self, from_utc: str, to_utc: str) -> list[dict]:
+        return self.q("""
+            SELECT p.cloud_project_name,
+                   SUM(f.busy_kwh + f.idle_kwh)       AS energy_kwh,
+                   SUM(f.busy_gCo2eq + f.idle_gCo2eq) AS carbon_g
+            FROM fact_usage f
+            JOIN dim_project p ON p.project_id = f.project_id
+            WHERE f.scope = 'project'
+              AND f.ts >= ? AND f.ts < ?
+            GROUP BY p.cloud_project_name
+            ORDER BY energy_kwh DESC
+        """, (from_utc, to_utc))
+
+    def top_groups_by_energy(self, q_start: str, q_end: str, n: int = 10) -> list[dict]:
+        return self.q("""
+            WITH group_ts AS (
+              SELECT g.group_name, f.ts, (f.busy_kwh + f.idle_kwh) AS kwh
+              FROM fact_usage f
+              JOIN dim_user u ON u.user_id = f.user_id
+              JOIN dim_group g ON g.group_id = u.group_id
+              WHERE f.scope = 'user'
+                AND f.ts >= ? AND f.ts < ?
+            )
+            SELECT group_name, SUM(kwh) AS energy_kwh
+            FROM group_ts
+            GROUP BY group_name
+            ORDER BY energy_kwh DESC
+            LIMIT ?
+        """, (q_start, q_end, n))
+
+    def machine_intensity_trend(self, machine_name: str) -> list[dict]:
+        return self.q("""
+            SELECT m.machine_name,
+                   f.ts,
+                   COALESCE(
+                     f.intensity_gCo2eq_kwh,
+                     CASE WHEN (f.busy_kwh + f.idle_kwh) > 0
+                          THEN (f.busy_gCo2eq + f.idle_gCo2eq) / (f.busy_kwh + f.idle_kwh)
+                   END
+                   ) AS intensity_g_per_kwh
+            FROM fact_usage f
+            JOIN dim_machine m ON m.machine_id = f.machine_id
+            WHERE f.scope = 'machine' AND m.machine_name = ?
+            ORDER BY f.ts
+        """, (machine_name,))
+
+    def user_contribution_window(self, from_utc: str, to_utc: str) -> list[dict]:
+        return self.q("""
+            SELECT p.cloud_project_name,
+                   u.user_id,
+                   SUM(f.busy_kwh + f.idle_kwh) AS user_energy_kwh
+            FROM fact_usage f
+            JOIN dim_user    u  ON u.user_id    = f.user_id
+            JOIN map_user_project up ON up.user_id = u.user_id
+            JOIN dim_project p ON p.project_id = up.project_id
+            WHERE f.scope = 'user'
+              AND f.ts >= ? AND f.ts < ?
+            GROUP BY p.cloud_project_name, u.user_id
+            ORDER BY p.cloud_project_name, user_energy_kwh DESC
+        """, (from_utc, to_utc))
+
+    def machine_utilization_share(self, from_utc: str, to_utc: str) -> list[dict]:
+        return self.q("""
+            SELECT m.machine_name,
+                   SUM(f.busy_cpu_seconds_total) AS busy_s,
+                   SUM(f.idle_cpu_seconds_total) AS idle_s,
+                   ROUND(
+                     100.0 * SUM(f.busy_cpu_seconds_total)
+                     / NULLIF(SUM(f.busy_cpu_seconds_total + f.idle_cpu_seconds_total), 0), 1
+                   ) AS busy_pct
+            FROM fact_usage f
+            JOIN dim_machine m ON m.machine_id = f.machine_id
+            WHERE f.scope = 'machine'
+              AND f.ts >= ? AND f.ts < ?
+            GROUP BY m.machine_name
+            ORDER BY busy_pct DESC
+        """, (from_utc, to_utc))
 ```
