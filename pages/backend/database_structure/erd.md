@@ -8,7 +8,6 @@ nav_order: 2
 * Fix Mermaid ERD
 
 # Entity Relationship Diagram
-```mermaid
 erDiagram
   %% === Dimension tables ===
   dim_group {
@@ -87,9 +86,7 @@ erDiagram
   dim_machine ||--o{ fact_usage          : machine_scope_rows
   dim_user    ||--o{ fact_usage          : user_scope_rows
 
-  dim_instance||--o{ active_workspace    : hosts
-  dim_machine ||--o{ active_workspace    : runs_on
-  dim_user    ||--o{ active_workspace    : opened_by
-  dim_project ||--o{ active_workspace    : belongs_to
-
-```
+  dim_instance ||--o{ active_workspace   : hosts
+  dim_machine  ||--o{ active_workspace   : runs_on
+  dim_user     ||--o{ active_workspace   : opened_by
+  dim_project  ||--o{ active_workspace   : belongs_to
