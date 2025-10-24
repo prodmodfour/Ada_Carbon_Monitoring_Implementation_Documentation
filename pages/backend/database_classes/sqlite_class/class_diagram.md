@@ -4,7 +4,7 @@ parent: SQLite Class
 nav_order: 1
 ---
 
-## Class Diagram
+# Class Diagram
 ```mermaid
 classDiagram
     class UsageDB {

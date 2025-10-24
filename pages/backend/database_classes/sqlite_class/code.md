@@ -4,7 +4,7 @@ parent: SQLite Class
 nav_order: 3
 ---
 
-## Code
+# Code
 ```python
 from __future__ import annotations
 
