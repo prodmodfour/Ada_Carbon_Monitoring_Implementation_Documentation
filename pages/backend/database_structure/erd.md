@@ -5,7 +5,7 @@ nav_order: 2
 ---
 
 # Todo
-* Fix Mermaid ERD
+* Make this fit the page better
 
 # Entity Relationship Diagram
 ```mermaid
