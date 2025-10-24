@@ -13,7 +13,7 @@ erDiagram
     %% Dimension tables
     dim_group {
         INTEGER group_id PK
-        TEXT group_name UNIQUE
+        TEXT group_name UK
     }
     dim_user {
         TEXT user_id PK
@@ -22,11 +22,11 @@ erDiagram
     }
     dim_project {
         INTEGER project_id PK
-        TEXT cloud_project_name UNIQUE
+        TEXT cloud_project_name UK
     }
     dim_machine {
         INTEGER machine_id PK
-        TEXT machine_name UNIQUE
+        TEXT machine_name UK
     }
     dim_instance {
         INTEGER instance_id PK
@@ -35,7 +35,7 @@ erDiagram
         TEXT raw_label
     }
 
-    %% Many‑to‑many helper tables
+    %% Many-to-many helper tables
     map_user_project {
         TEXT user_id PK
         INTEGER project_id PK
@@ -48,7 +48,7 @@ erDiagram
     %% Fact table with metrics
     fact_usage {
         INTEGER usage_id PK
-        TEXT ts "ISO‑8601 timestamp"
+        TEXT ts "ISO-8601 timestamp"
         TEXT scope "ada|project|machine|user"
         INTEGER project_id FK
         INTEGER machine_id FK
@@ -69,7 +69,7 @@ erDiagram
         INTEGER machine_id FK
         TEXT user_id FK
         INTEGER project_id FK
-        TEXT started_at "ISO‑8601 timestamp"
+        TEXT started_at "ISO-8601 timestamp"
     }
 
     %% Derived views (treated as entities for completeness)
