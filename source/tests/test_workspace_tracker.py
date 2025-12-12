@@ -177,7 +177,7 @@ class TestWorkspaceTracker(unittest.TestCase):
         # Test that it can calculate equivalencies
         result = self.tracker.equivalency_calc.calculate_equivalencies(100.0)
         self.assertIn("equivalencies", result)
-        self.assertIn("miles_driven_car", result["equivalencies"])
+        self.assertIn("miles_driven", result["equivalencies"])
 
     def test_workspace_cleanup(self):
         """Test removing workspaces from tracking."""
