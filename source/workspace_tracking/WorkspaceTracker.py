@@ -14,10 +14,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from mongodb.MongoDBClient import MongoDBClient
 from prometheus.PrometheusAPIClient import PrometheusAPIClient
 from usage_calculation.CarbonIntensityAPIClient import CarbonIntensityAPIClient
-from usage_calculation.usage_calculation_functions import (
-    estimate_electricity_usage_kwh,
-    estimate_carbon_footprint_gCO2eq
-)
+from usage_calculation.ElectricityEstimator import ElectricityEstimator
+from usage_calculation.CarbonCalculator import CarbonCalculator
 from workspace_tracking.WorkspaceUsageEntry import WorkspaceUsageEntry
 from workspace_tracking.CarbonEquivalencyCalculator import CarbonEquivalencyCalculator
 
@@ -70,6 +68,11 @@ class WorkspaceTracker:
         self.carbon_client = CarbonIntensityAPIClient()
 
         self.equivalency_calc = CarbonEquivalencyCalculator()
+
+        # Initialize calculation helpers
+        self.carbon_calculator = CarbonCalculator(self.carbon_client)
+        # Use busy=12W, idle=1W as per specification
+        self.electricity_estimator = ElectricityEstimator(busy_power_w=12.0, idle_power_w=1.0)
 
         # Configuration
         self.default_cpu_tdp_w = default_cpu_tdp_w
@@ -188,36 +191,34 @@ class WorkspaceTracker:
                     cpu_data["idle"]
                 )
 
-                # Calculate energy usage
-                busy_kwh = estimate_electricity_usage_kwh(
-                    cpu_data["busy"],
-                    self.default_cpu_tdp_w
+                # Calculate energy usage using ElectricityEstimator
+                busy_kwh = self.electricity_estimator.estimate_busy_usage_kwh(
+                    cpu_data["busy"]
                 )
-                idle_kwh = estimate_electricity_usage_kwh(
-                    cpu_data["idle"],
-                    self.default_cpu_tdp_w
+                idle_kwh = self.electricity_estimator.estimate_idle_usage_kwh(
+                    cpu_data["idle"]
                 )
                 entry.set_usage_kwh(busy_kwh, idle_kwh)
 
-                # Get carbon intensity and calculate emissions
-                carbon_intensity = self.carbon_client.get_carbon_intensity(timestamp)
-                if carbon_intensity:
-                    busy_gco2eq = estimate_carbon_footprint_gCO2eq(
-                        busy_kwh,
-                        carbon_intensity
-                    )
-                    idle_gco2eq = estimate_carbon_footprint_gCO2eq(
-                        idle_kwh,
-                        carbon_intensity
-                    )
+                # Get carbon intensity and calculate emissions using CarbonCalculator
+                # Use detailed calculation for better accuracy
+                carbon_result = self.carbon_calculator.estimate_carbon_footprint_detailed(
+                    busy_cpu_seconds=cpu_data["busy"],
+                    idle_cpu_seconds=cpu_data["idle"],
+                    busy_power_w=self.electricity_estimator.busy_power_w,
+                    idle_power_w=self.electricity_estimator.idle_power_w,
+                    start_time=timestamp
+                )
+
+                if carbon_result:
                     entry.set_usage_gco2eq(
-                        busy_gco2eq,
-                        idle_gco2eq,
-                        carbon_intensity
+                        carbon_result["carbon_gco2eq"]["busy"],
+                        carbon_result["carbon_gco2eq"]["idle"],
+                        carbon_result["carbon_intensity_g_per_kwh"]
                     )
 
                     # Calculate equivalencies
-                    total_gco2eq = busy_gco2eq + idle_gco2eq
+                    total_gco2eq = carbon_result["carbon_gco2eq"]["total"]
                     equivalencies = self.equivalency_calc.get_top_equivalencies(
                         total_gco2eq,
                         count=5

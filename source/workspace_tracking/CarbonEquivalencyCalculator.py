@@ -18,23 +18,36 @@ class CarbonEquivalencyCalculator:
     """
 
     # Conversion factors (gCO2eq per unit)
+    # Sources: EPA Greenhouse Gas Equivalencies Calculator (2024 factors),
+    # UK DEFRA / Carbon Trust estimates
     EQUIVALENCIES = {
         # Transportation
-        "miles_driven_car": 404,  # gCO2eq per mile (average passenger vehicle)
-        "km_driven_car": 251,     # gCO2eq per km
+        # EPA: Average passenger vehicle emits ~400 grams CO2e per mile
+        "miles_driven_car": 400.0,  # gCO2eq per mile (average passenger vehicle)
+        "km_driven_car": 251,       # gCO2eq per km
 
         # Trees (carbon sequestration)
         "tree_year": 21772,       # gCO2eq sequestered per tree per year (avg)
         "tree_day": 59.6,         # gCO2eq sequestered per tree per day
 
         # Electronics
-        "smartphone_charge": 8.22,     # gCO2eq per smartphone charge
+        # EPA: Average smartphone charge requires ~0.012 kWh
+        # Global/US avg carbon intensity ~ 0.3-0.4 kg/kWh -> approx 5-8 grams per charge
+        "smartphone_charge": 8.22,     # gCO2eq per full smartphone charge
         "laptop_charge": 47.0,         # gCO2eq per laptop charge (50Wh battery)
         "tablet_charge": 19.0,         # gCO2eq per tablet charge
 
         # Lighting
         "led_bulb_hour": 9.0,          # gCO2eq per hour (10W LED bulb)
         "incandescent_hour": 45.0,     # gCO2eq per hour (60W incandescent)
+
+        # Streaming & Entertainment
+        # Carbon Trust (Europe): 1 hour of video streaming (TV/Laptop) is approx 55g CO2e
+        "streaming_hour": 55.0,        # gCO2eq per hour of HD video streaming
+
+        # UK Specific
+        # Beeco/Carbon Footprint Ltd: Boiling 1 liter of water in electric kettle
+        "kettle_boil": 70.0,           # gCO2eq per liter boiled
 
         # Fuel
         "kg_coal_burned": 2419,        # gCO2eq per kg of coal burned
@@ -117,6 +130,19 @@ class CarbonEquivalencyCalculator:
             "value": gco2eq / self.EQUIVALENCIES["led_bulb_hour"],
             "unit": "hours",
             "description": "Hours of 10W LED light bulb usage"
+        }
+
+        # Streaming & UK Specific
+        equivalencies["streaming_hours"] = {
+            "value": gco2eq / self.EQUIVALENCIES["streaming_hour"],
+            "unit": "hours",
+            "description": "Hours of HD video streaming (Netflix, etc.)"
+        }
+
+        equivalencies["kettles_boiled"] = {
+            "value": gco2eq / self.EQUIVALENCIES["kettle_boil"],
+            "unit": "liters",
+            "description": "Liters of water boiled in an electric kettle"
         }
 
         # Fuel
