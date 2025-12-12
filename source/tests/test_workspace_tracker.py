@@ -27,7 +27,7 @@ class TestWorkspaceTracker(unittest.TestCase):
 
         self.mock_mongo = self.mongo_patcher.start()
         self.mock_prom = self.prom_patcher.start()
-        self.mock_carbon = self.mock_carbon_patcher.start()
+        self.mock_carbon = self.carbon_patcher.start()
 
         # Create tracker instance
         self.tracker = WorkspaceTracker(

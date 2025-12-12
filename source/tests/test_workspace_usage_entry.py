@@ -207,20 +207,20 @@ class TestWorkspaceUsageEntry(unittest.TestCase):
         self.entry.set_cpu_seconds_total(3600.0, 1800.0)
         self.assertEqual(self.entry.status, "downloaded")
 
-        # Add energy
+        # Add energy (still downloaded - need carbon for processed)
         self.entry.set_usage_kwh(2.5, 1.0)
+        self.assertEqual(self.entry.status, "downloaded")
+
+        # Add carbon (now processed - has CPU, kwh, and carbon)
+        self.entry.set_usage_gco2eq(100.0, 50.0)
         self.assertEqual(self.entry.status, "processed")
 
-        # Add timestamp (not enough for complete)
+        # Add timestamp (still processed - missing user)
         self.entry.set_timestamp(datetime.now())
         self.assertEqual(self.entry.status, "processed")
 
-        # Add user info (still not complete - missing carbon)
+        # Add user info (now complete - has everything)
         self.entry.set_user_info({"name": "Test"})
-        self.assertEqual(self.entry.status, "processed")
-
-        # Add carbon to make complete
-        self.entry.set_usage_gco2eq(100.0, 50.0)
         self.assertEqual(self.entry.status, "complete")
 
 

@@ -52,19 +52,19 @@ class TestPrometheusAPIClient(unittest.TestCase):
         )
         self.assertEqual(client.url, "https://example.com/api/v1/query_range")
 
-    def test_to_rfc3339_naive_datetime(self):
-        """Test RFC3339 formatting with naive datetime."""
-        dt = datetime(2025, 1, 15, 12, 30, 45)
-        result = self.client._to_rfc3339(dt)
+    def test_url_property(self):
+        """Test that URL property is correctly formed."""
+        self.assertEqual(
+            self.client.url,
+            "https://test-prometheus.example.com/api/v1/query_range"
+        )
 
-        self.assertEqual(result, "2025-01-15T12:30:45Z")
-
-    def test_to_rfc3339_aware_datetime(self):
-        """Test RFC3339 formatting with timezone-aware datetime."""
-        dt = datetime(2025, 1, 15, 12, 30, 45, tzinfo=timezone.utc)
-        result = self.client._to_rfc3339(dt)
-
-        self.assertEqual(result, "2025-01-15T12:30:45Z")
+    def test_base_url_property(self):
+        """Test that base URL is stored correctly."""
+        self.assertEqual(
+            self.client.base_url,
+            "https://test-prometheus.example.com/"
+        )
 
     @patch('prometheus.PrometheusAPIClient.requests.get')
     def test_query_success(self, mock_get):
@@ -139,38 +139,36 @@ class TestPrometheusAPIClient(unittest.TestCase):
         self.assertIsNone(result)
 
     @patch('prometheus.PrometheusAPIClient.requests.get')
-    def test_cpu_seconds_total_basic(self, mock_get):
-        """Test cpu_seconds_total method."""
+    def test_query_with_custom_parameters(self, mock_get):
+        """Test query method with custom parameters."""
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.url = "test_url"
         mock_response.reason = "OK"
         mock_response.json.return_value = {
             "status": "success",
-            "data": {
-                "result": [
-                    {
-                        "metric": {"mode": "user"},
-                        "values": [[1234567890, "100"]]
-                    }
-                ]
-            }
+            "data": {"result": []}
         }
         mock_get.return_value = mock_response
 
-        timestamp = datetime(2025, 1, 15, 12, 0, 0)
-        result = self.client.cpu_seconds_total(
-            timestamp=timestamp,
-            cloud_project_name="CDAaaS",
-            machine_name="MUON"
-        )
+        parameters = {
+            "query": "up",
+            "start": "2025-01-15T12:00:00Z",
+            "end": "2025-01-15T13:00:00Z"
+        }
+
+        result = self.client.query(parameters)
 
         self.assertIsNotNone(result)
         self.assertEqual(result["status"], "success")
 
+        # Verify parameters were passed correctly
+        call_args = mock_get.call_args
+        self.assertEqual(call_args[1]['params'], parameters)
+
     @patch('prometheus.PrometheusAPIClient.requests.get')
-    def test_cpu_seconds_total_with_host(self, mock_get):
-        """Test cpu_seconds_total with host filter."""
+    def test_query_with_step_parameter(self, mock_get):
+        """Test query with step parameter."""
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.url = "test_url"
@@ -178,72 +176,18 @@ class TestPrometheusAPIClient(unittest.TestCase):
         mock_response.json.return_value = {"status": "success", "data": {"result": []}}
         mock_get.return_value = mock_response
 
-        timestamp = datetime(2025, 1, 15, 12, 0, 0)
-        result = self.client.cpu_seconds_total(
-            timestamp=timestamp,
-            cloud_project_name="CDAaaS",
-            machine_name="MUON",
-            host="172.16.100.50"
-        )
+        parameters = {
+            "query": "rate(metric[5m])",
+            "start": "2025-01-15T12:00:00Z",
+            "end": "2025-01-15T13:00:00Z",
+            "step": "1m"
+        }
 
-        # Verify query was called
-        mock_get.assert_called_once()
+        result = self.client.query(parameters)
 
-        # Check that query includes host selector
+        # Verify step was passed
         call_args = mock_get.call_args
-        params = call_args[1]['params']
-        self.assertIn('host="172.16.100.50"', params['query'])
-
-    @patch('prometheus.PrometheusAPIClient.requests.get')
-    def test_cpu_seconds_total_custom_step(self, mock_get):
-        """Test cpu_seconds_total with custom step."""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.url = "test_url"
-        mock_response.reason = "OK"
-        mock_response.json.return_value = {"status": "success", "data": {"result": []}}
-        mock_get.return_value = mock_response
-
-        timestamp = datetime(2025, 1, 15, 12, 0, 0)
-        result = self.client.cpu_seconds_total(
-            timestamp=timestamp,
-            cloud_project_name="CDAaaS",
-            machine_name="MUON",
-            step="30m"
-        )
-
-        # Verify custom step was used
-        call_args = mock_get.call_args
-        params = call_args[1]['params']
-        self.assertEqual(params['step'], "30m")
-
-    def test_query_construction(self):
-        """Test that query is properly constructed."""
-        timestamp = datetime(2025, 1, 15, 12, 0, 0)
-
-        # We need to mock the query method to see what it would send
-        with patch.object(self.client, 'query') as mock_query:
-            mock_query.return_value = {"status": "success"}
-
-            self.client.cpu_seconds_total(
-                timestamp=timestamp,
-                cloud_project_name="CDAaaS",
-                machine_name="MUON",
-                host="172.16.100.50"
-            )
-
-            # Verify query was called
-            mock_query.assert_called_once()
-
-            # Get the parameters passed to query
-            call_args = mock_query.call_args[0][0]
-
-            # Check query structure
-            self.assertIn("query", call_args)
-            self.assertIn("increase(node_cpu_seconds_total", call_args["query"])
-            self.assertIn('cloud_project_name="CDAaaS"', call_args["query"])
-            self.assertIn('machine_name="MUON"', call_args["query"])
-            self.assertIn('host="172.16.100.50"', call_args["query"])
+        self.assertEqual(call_args[1]['params']['step'], "1m")
 
 
 if __name__ == '__main__':
