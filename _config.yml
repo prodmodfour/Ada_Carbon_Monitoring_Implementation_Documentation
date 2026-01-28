@@ -12,6 +12,9 @@ plugins:
   - jekyll-remote-theme
   - jekyll-toc
 
+exclude:
+  - source/
+
 search_enabled: true
 color_scheme: dark
 
