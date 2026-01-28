@@ -6,30 +6,120 @@ nav_exclude: false
 permalink: /
 ---
 
-# What is this?
+# Ada Carbon Monitoring Documentation
 
-This github page documents the implementation of carbon monitoring in the Ada platform.
+This documentation covers the implementation of carbon monitoring for the Ada platform.
 
-You can view the Ada website here: https://ada.stfc.ac.uk/ 
+**Ada Platform:** [https://ada.stfc.ac.uk/](https://ada.stfc.ac.uk/)
 
-# What is carbon monitoring?
-Carbon Monitoring refers to systems that:
-1. Determine how much Co2 (or Co2 equivalent) was released by the platform that you are monitoring.
-2. Collect that data over a time period.
-3. Display that data to the user.
+## Implementation Status
 
-# What is the Ada Platform?
-The Ada platform is a service available to members of STFC (https://www.ukri.org/councils/stfc/).
-It allows users to create and use virtual machines that are powered by the R86 data centre at STFC's Rutherford Appleton Laboratory. 
+{: .highlight }
+> **Status: Complete** - The carbon monitoring system is fully implemented and ready for deployment.
 
-## Who uses the Ada platform? 
-The platform is used by scientists. At the time of writing, the service is used by members of ISIS, CLF and Diamond.
+| Component | Status |
+|-----------|--------|
+| Backend API (`ada-carbon-monitoring-api`) | Complete |
+| API Integration (`ada-api`) | Complete |
+| Frontend UI (`ada-ui`) | Complete |
+| User Attribution | Complete |
+| Group Attribution | Complete |
+| Documentation | Complete |
 
-## What are these virtual machines used for?
-These virtual machines are used to:
-* Run workloads that would be too computationally intensive for the user's usual workstation
-* Access a specific set of software that has been preinstalled.
+## Quick Links
 
-# What is STFC?
-STFC stands for the Science and Technology Facilities Council, a UK government agency at the forefront of scientific and engineering research. 
+- [Getting Started](quickstart.html) - Set up and run the system
+- [API Reference](api_reference.html) - All API endpoints
+- [Backend](backend/2_backend.html) - Backend architecture
+- [Frontend](frontend/3_frontend.html) - Svelte components
 
+## What is Carbon Monitoring?
+
+Carbon monitoring systems:
+1. **Measure** - Determine how much CO2 (or CO2 equivalent) was released by computing workloads
+2. **Collect** - Store that data over time for analysis
+3. **Display** - Show users their carbon footprint with actionable insights
+
+## What is the Ada Platform?
+
+The Ada platform is a service for members of [STFC](https://www.ukri.org/councils/stfc/), providing:
+- Virtual machines powered by the R86 data centre at Rutherford Appleton Laboratory
+- Remote data analysis for ISIS Neutron and Muon Source
+- Workspaces for CLF (Central Laser Facility)
+- Training environments for scientific computing
+
+### Who Uses Ada?
+
+Scientists from:
+- **ISIS** - Neutron and muon research
+- **CLF** - Laser physics research
+- **Diamond** - Synchrotron research
+- **Training** - Scientific computing courses
+
+### What Are Workspaces Used For?
+
+- Running computationally intensive analysis
+- Accessing pre-installed scientific software
+- Remote access to facility data
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        ada-ui                               │
+│                   (Svelte Frontend)                         │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐   │
+│  │  Dashboard  │ │   Heatmap   │ │  Intensity Forecast │   │
+│  └─────────────┘ └─────────────┘ └─────────────────────┘   │
+└────────────────────────┬────────────────────────────────────┘
+                         │ API calls
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       ada-api                               │
+│                  (FastAPI Proxy)                            │
+└────────────────────────┬────────────────────────────────────┘
+                         │ Proxy
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│               ada-carbon-monitoring-api                     │
+│                     (FastAPI)                               │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐   │
+│  │ Calculators │ │   Clients   │ │      Models         │   │
+│  └─────────────┘ └─────────────┘ └─────────────────────┘   │
+└───────┬─────────────────┬───────────────────┬───────────────┘
+        │                 │                   │
+        ▼                 ▼                   ▼
+┌───────────────┐ ┌───────────────┐ ┌─────────────────────────┐
+│  Prometheus   │ │   MongoDB     │ │  UK Carbon Intensity    │
+│ (CPU metrics) │ │  (via ada-db) │ │        API              │
+└───────────────┘ └───────────────┘ └─────────────────────────┘
+```
+
+## Key Features
+
+### Carbon Dashboard
+- **Summary Cards** - Energy (kWh), Carbon (gCO2eq), Workspaces, CPU time
+- **Carbon Intensity Forecast** - UK grid forecast with best 3-hour window
+- **Heatmap** - GitHub-style year view of daily carbon
+- **Stacked Bar Chart** - Busy vs idle breakdown by day/month/year
+- **Equivalencies** - Miles driven, smartphone charges, trees, etc.
+
+### Attribution
+- **User Attribution** - Track carbon by workspace owner
+- **Group Attribution** - Track carbon by cloud project + machine type
+
+### Carbon Calculation
+```
+Energy (kWh) = (12W × busy_seconds + 1W × idle_seconds) / 3,600,000
+Carbon (gCO2eq) = Energy (kWh) × Carbon Intensity (gCO2/kWh)
+```
+
+## Documentation Sections
+
+| Section | Content |
+|---------|---------|
+| [Green Computing Basics](0_green_computing_basics.html) | Carbon concepts and reduction methods |
+| [Software Used](1_software_used.html) | Technology stack |
+| [Backend](backend/2_backend.html) | API architecture and endpoints |
+| [Frontend](frontend/3_frontend.html) | Svelte component reference |
+| [API Reference](api_reference.html) | Complete API documentation |

@@ -1,78 +1,221 @@
 ---
 title: Software Used
 nav_order: 3
-nav_exclude: false     
+nav_exclude: false
 ---
 
-# Todo
-* With the transition from a mock implementation to an actual implementation, this section will need to be revised
+# Technology Stack
 
-# APIs
-## Carbon Intensity API
+This page documents the technologies used in the Ada Carbon Monitoring system.
 
+## External APIs
 
-The [Carbon Intensity API](https://carbon-intensity.github.io/api-definitions/#carbon-intensity-api-v2-0-0) provides real-time and historical data about the carbon intensity of electricity generation — that is, how much carbon dioxide (CO₂) is emitted to produce a unit of electricity (usually measured in grams of CO₂ per kilowatt-hour, gCO₂/kWh).
+### UK Carbon Intensity API
 
-We use the [Carbon Intensity API](https://carbon-intensity.github.io/api-definitions/#carbon-intensity-api-v2-0-0) to get the carbon intensity of electricity in the south east region of England (Where the data centre that Ada runs on in). This is used to estimate the carbon footprint of our compute usage.
+The [Carbon Intensity API](https://carbon-intensity.github.io/api-definitions/#carbon-intensity-api-v2-0-0) provides real-time and forecast data about the carbon intensity of UK electricity generation.
 
-# Databases
-## Prometheus
-We use [Prometheus](https://prometheus.io/) to collect and store metrics from our compute clusters. Prometheus is a time-series database that is well-suited for storing metrics data.
+- **Endpoint:** `https://api.carbonintensity.org.uk/intensity`
+- **Data:** gCO2/kWh for each 30-minute period
+- **Coverage:** Great Britain (England, Scotland, Wales)
+- **Update frequency:** Every 30 minutes
 
-[Prometheus](https://prometheus.io/) is an open-source monitoring system built around **time-series metrics**. It:
+We use this API to:
+- Get current carbon intensity for real-time calculations
+- Get 24/48 hour forecasts for the intensity chart
+- Calculate carbon footprint from electricity usage
 
-* **Scrapes (pulls)** metrics over HTTP from targets on a schedule.
-* Stores them in a local **TSDB** with labels (key=value) for rich dimensional queries.
-* Lets you query with **PromQL**.
+## Databases
 
+### Prometheus
 
-### How node_exporter works (incl. on VMs)
+[Prometheus](https://prometheus.io/) is our time-series database for CPU metrics.
 
-`node_exporter` is the standard OS-level exporter for *nix systems.
+**What it stores:**
+- `node_cpu_seconds_total` - CPU time by mode (busy/idle/user/system)
+- Labels: `cloud_project_name`, `machine_name`, `instance`, `mode`
 
-* **Where it runs:** Inside each VM . It’s a single binary, usually run as a systemd service, non-root.
-* **What it collects:** Host/VM metrics such as CPU, memory, disk, filesystems, network, load, interrupts, etc., primarily from **/proc** and **/sys** (plus optional collectors like `systemd`, `processes`, `textfile`).
-* **How it exposes data:** An HTTP endpoint  that returns either  plaintext Prometheus metrics or JSON files (unverified).
-* **How data gets to Prometheus:** Prometheus **pulls** from each VM’s node_exporter on a scrape interval (Potentially every 15 seconds, unverified).
+**How we query it:**
+```promql
+increase(node_cpu_seconds_total{
+    cloud_project_name="IDAaaS",
+    machine_name="Muon"
+}[1h])
+```
 
-### How do we pull data from Prometheus?
-See [Prometheus Request Class](../pages/backend/database_classes/prometheus_request_class.html) for more details.
+**Data collection:**
+- `node_exporter` runs on each VM
+- Scrapes CPU metrics from `/proc/stat`
+- Prometheus pulls data every 15 seconds
 
+**Our Prometheus server:** `https://host-172-16-100-248.nubes.stfc.ac.uk/`
 
-## MongoDB
-[MongoDB](https://www.mongodb.com/) is a document-oriented NoSQL database that stores data in flexible, JSON-like BSON documents instead of rows and tables. It’s schema-optional, so fields can differ across documents and evolve over time. MongoDB is used to store the qualitative data for each workspace, as opposed to quantiative metrics data which is stored in Prometheus.
+### MongoDB
 
-The mongoDB database stores the user and group that each workspace belongs to. We match this qualitative data with the prometheus metrics by matching timestamps.
-To see more details, refer to [Group Attribution](../pages/backend/usage_estimation_methods/group_attribution.md) and [User Attribution](../pages/backend/usage_estimation_methods/user_attribution.md).
+[MongoDB](https://www.mongodb.com/) stores workspace and user data through the Ada platform.
 
-## SQLite
+**Key collections:**
+| Collection | Purpose |
+|------------|---------|
+| `workspaces` | Active and historical workspace records |
+| `users` | User information (platform_name, email, tag) |
+| `groups` | Experiment groups (RB numbers, training courses) |
 
+**Access method:** Via `ada-db-interface` REST API
 
-[SQLite](https://www.sqlite.org/index.html) is a lightweight, serverless SQL database engine that stores an entire database in a single cross-platform file. It’s zero-configuration (no separate server process), fully ACID-compliant, and implements most of SQL.
+**Example workspace document:**
+```json
+{
+    "_id": ObjectId("..."),
+    "hostname": "host-172-16-100-50.nubes.stfc.ac.uk",
+    "owner": "aa123456",
+    "tag": "ISIS",
+    "state": "READY",
+    "created_time": ISODate("2026-01-28T09:00:00Z")
+}
+```
 
-We use [SQLite](https://www.sqlite.org/index.html) to store our usage data.
+{: .warning }
+> **SQLite is deprecated.** Earlier documentation referenced SQLite for local storage. The current implementation uses MongoDB exclusively.
 
-To see the structure of our database, refer to [Database Structure](../pages/backend/database_structure/database_structure.md).
+## Programming Languages
 
-To see how we pull data from SQLite, refer to [SQLite Class](../pages/backend/database_classes/sqlite_class.md).
+### Python
 
-# Programming Languages
-## Python
-We use [Python](https://www.python.org/) for our backend development. Python is a versatile and powerful programming language that is well-suited for web development and data analysis.
+Backend development uses Python 3.11+ with:
+- **FastAPI** - Modern async web framework
+- **Pydantic** - Data validation and settings management
+- **uvicorn** - ASGI server
+- **requests** - HTTP client
+- **pymongo** - MongoDB driver
 
-## JavaScript
-We use [JavaScript](https://developer.mozilla.org/en-US/docs/Web/JavaScript) for our frontend development. JavaScript is a popular programming language that is used to create interactive web applications.
-# Frontend
-## Svelte
-We use [Svelte](https://svelte.dev/) for our frontend development. Svelte is a modern JavaScript framework that allows us to create fast and efficient web applications.
-## Chart.js
-We use [Chart.js](https://www.chartjs.org/) to create interactive charts and graphs for our frontend. Chart.js is a simple and flexible JavaScript charting library.
-# Backend
-## Flask
-We use [Flask](https://flask.palletsprojects.com/en/2.3.x/) for our backend development. Flask is a lightweight web framework that allows us to create RESTful APIs and web applications.
-# Documentation
-## Jekyll
-We use [Jekyll](https://jekyllrb.com/) to create our documentation website. Jekyll is a static site generator that allows us to create fast and efficient websites using Markdown.
-## Mermaid.js
-We use [Mermaid.js](https://mermaid-js.github.io/mermaid/#/) to create diagrams for our documentation. Mermaid.js is a simple and powerful tool that allows us to create diagrams using a simple syntax.
+### JavaScript/TypeScript
 
+Frontend development uses:
+- **Svelte** - Component framework
+- **Vite** - Build tool and dev server
+- **Chart.js** - Charting library
+
+## Backend Framework
+
+### FastAPI
+
+[FastAPI](https://fastapi.tiangolo.com/) is our backend framework, chosen for:
+- Automatic OpenAPI documentation
+- Type hints and validation
+- Async support
+- High performance
+
+**Key features used:**
+- APIRouter for modular endpoints
+- Dependency injection
+- Pydantic models for request/response validation
+- Background tasks
+
+**Example endpoint:**
+```python
+from fastapi import APIRouter, Query
+from pydantic import BaseModel
+
+router = APIRouter(prefix="/carbon")
+
+class CarbonResponse(BaseModel):
+    intensity: float
+    index: str
+
+@router.get("/intensity/current", response_model=CarbonResponse)
+async def get_current_intensity():
+    client = CarbonIntensityAPIClient()
+    return client.get_current_intensity()
+```
+
+{: .note }
+> Earlier documentation mentioned Flask. The implementation now uses FastAPI.
+
+## Frontend Framework
+
+### Svelte
+
+[Svelte](https://svelte.dev/) is our frontend framework in `ada-ui`.
+
+**Key features:**
+- Reactive declarations
+- Component scoped styles
+- No virtual DOM (compiles to vanilla JS)
+- Small bundle size
+
+**Example component:**
+```svelte
+<script>
+  import { onMount } from "svelte";
+  import { getCurrentIntensity } from "$api/carbon";
+
+  let intensity = null;
+
+  onMount(async () => {
+    intensity = await getCurrentIntensity();
+  });
+</script>
+
+<div class="intensity">
+  {#if intensity}
+    <span>{intensity.intensity} gCO2/kWh</span>
+  {:else}
+    <span>Loading...</span>
+  {/if}
+</div>
+```
+
+### Chart.js
+
+[Chart.js](https://www.chartjs.org/) renders our data visualizations:
+- Line charts (carbon intensity forecast)
+- Bar charts (stacked busy/idle breakdown)
+- Custom plugins (heatmap, annotations)
+
+### SMUI (Svelte Material UI)
+
+[SMUI](https://sveltematerialui.com/) provides Material Design components:
+- Buttons, cards, dialogs
+- Progress indicators
+- Form components
+
+## Documentation
+
+### Jekyll
+
+[Jekyll](https://jekyllrb.com/) generates this documentation site.
+
+**Theme:** Just the Docs
+**Hosting:** GitHub Pages
+
+### Mermaid.js
+
+[Mermaid.js](https://mermaid.js.org/) renders diagrams in documentation:
+
+```mermaid
+graph TD
+    A[ada-ui] --> B[ada-api]
+    B --> C[ada-carbon-monitoring-api]
+    C --> D[Prometheus]
+    C --> E[MongoDB]
+    C --> F[Carbon Intensity API]
+```
+
+## Development Tools
+
+| Tool | Purpose |
+|------|---------|
+| Git | Version control |
+| pytest | Python testing |
+| Playwright | E2E testing |
+| ESLint | JavaScript linting |
+| Black | Python formatting |
+
+## Deployment
+
+| Component | Technology |
+|-----------|------------|
+| Backend | Docker / systemd |
+| Frontend | Nginx / Node |
+| Database | Managed MongoDB |
+| Metrics | Prometheus + node_exporter |
