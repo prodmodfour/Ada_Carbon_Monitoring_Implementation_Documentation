@@ -12,27 +12,6 @@ This documentation covers the implementation of carbon monitoring for the Ada pl
 
 **Ada Platform:** [https://ada.stfc.ac.uk/](https://ada.stfc.ac.uk/)
 
-## Implementation Status
-
-{: .highlight }
-> **Status: Complete** - The carbon monitoring system is fully implemented and ready for deployment.
-
-| Component | Status |
-|-----------|--------|
-| Backend API (`ada-carbon-monitoring-api`) | Complete |
-| API Integration (`ada-api`) | Complete |
-| Frontend UI (`ada-ui`) | Complete |
-| User Attribution | Complete |
-| Group Attribution | Complete |
-| Documentation | Complete |
-
-## Quick Links
-
-- [Getting Started](quickstart.html) - Set up and run the system
-- [API Reference](api_reference.html) - All API endpoints
-- [Backend](backend/2_backend.html) - Backend architecture
-- [Frontend](frontend/3_frontend.html) - Svelte components
-
 ## What is Carbon Monitoring?
 
 Carbon monitoring systems:
