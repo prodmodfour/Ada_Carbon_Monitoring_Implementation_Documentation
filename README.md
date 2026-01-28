@@ -122,10 +122,6 @@ pages/
     └── 3_frontend.md           # Svelte components
 ```
 
-## Reference Implementations
-
-The `source/` directory contains reference implementations used during development. The production code lives in `ada-carbon-monitoring-api`.
-
 ## What is Carbon Monitoring?
 
 Carbon monitoring systems:

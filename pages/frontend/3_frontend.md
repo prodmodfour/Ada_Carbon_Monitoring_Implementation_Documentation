@@ -389,14 +389,3 @@ Components use:
 | `carbon-labs-platform` | Production - Carbon in Labs sidebar |
 | `carbon-labs-demo` | Demo mode with fake data banner |
 
----
-
-## Reference Implementations
-
-The `source/charts/` directory contains vanilla JS reference implementations:
-- `stacked_bar_chart/` - Stacked bar chart
-- `github_style/` - Heatmap
-- `busy_only_bar_chart/` - Single dataset bar chart
-- `busy_only_github_style/` - Busy-only heatmap
-
-These can be used as references for porting to other frameworks.

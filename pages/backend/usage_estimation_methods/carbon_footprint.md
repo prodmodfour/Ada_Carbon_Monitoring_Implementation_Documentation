@@ -1,6 +1,7 @@
 ---
 title: Carbon Footprint
 parent: Usage Estimation
+grand_parent: Backend
 nav_order: 2
 ---
 
@@ -286,7 +287,7 @@ equivalencies = calc.get_top_equivalencies(total_gco2eq)
 # }
 ```
 
-→ See [Carbon Equivalencies](../../frontend/carbon_equivalents_example.html) for UI display
+→ See [Frontend Components](../../frontend/3_frontend.html) for the CarbonEquivalencies Svelte component
 
 ## Data Quality Notes
 
