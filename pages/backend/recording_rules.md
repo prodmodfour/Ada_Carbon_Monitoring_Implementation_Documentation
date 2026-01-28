@@ -8,7 +8,9 @@ nav_order: 4
 
 Recording rules pre-aggregate common queries so the carbon dashboard loads quickly. Without them, each API call runs expensive `increase()` queries across all time series in real time.
 
-The rules file is at `prometheus-preprod/prometheus/recording_rules.yml` in ada-carbon-monitoring-api.
+The rules file is in ada-carbon-monitoring-api: [recording_rules.yml](https://github.com/prodmodfour/ada-carbon-monitoring-api/blob/carbon-labs-platform/prometheus-preprod/prometheus/recording_rules.yml)
+
+**Production Prometheus:** [https://host-172-16-100-248.nubes.stfc.ac.uk](https://host-172-16-100-248.nubes.stfc.ac.uk)
 
 ## Why Recording Rules?
 
@@ -58,10 +60,10 @@ sudo systemctl restart prometheus
 
 ### 4. Verify
 
-Open the Prometheus UI at `/rules` or query the API:
+Open the Prometheus UI at [https://host-172-16-100-248.nubes.stfc.ac.uk/rules](https://host-172-16-100-248.nubes.stfc.ac.uk/rules) or query the API:
 
 ```bash
-curl -s http://localhost:9090/api/v1/rules | jq '.data.groups | length'
+curl -s https://host-172-16-100-248.nubes.stfc.ac.uk/api/v1/rules | jq '.data.groups | length'
 # Expected: 3
 ```
 
