@@ -122,11 +122,9 @@ pages/
     └── 3_frontend.md           # Svelte components
 ```
 
-## Deprecated Documentation
+## Reference Implementations
 
-The following documentation is **deprecated** (old SQLite-based design):
-- `pages/backend/database_structure/sql_*.md`
-- `pages/backend/database_classes/sqlite_class/`
+The `source/` directory contains reference implementations used during development. The production code lives in `ada-carbon-monitoring-api`.
 
 ## What is Carbon Monitoring?
 
